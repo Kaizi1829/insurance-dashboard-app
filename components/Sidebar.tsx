@@ -67,13 +67,11 @@ const active = pathname === item.href
 return(
 
 <Link
-key={item.href}
-href={`${item.href}`}
-className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition
-${active
-? "bg-[#003A8F] text-white"
-: "text-slate-600 hover:bg-slate-100"
-}`}
+  key={item.href}
+  href={item.href as any}
+  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition
+  ${activo ? "bg-[#003A8F] text-white" : ""}
+`}
 >
 
 <Icon size={18}/>
