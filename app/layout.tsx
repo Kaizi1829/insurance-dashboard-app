@@ -25,17 +25,15 @@ return (
 
 <div className="flex min-h-screen">
 
-{/* SIDEBAR */}
+  {/* SIDEBAR */}
+  <div className="w-64">
+    <Sidebar />
+  </div>
 
-<Sidebar />
-
-{/* CONTENIDO */}
-
-<main className="flex-1 p-8">
-
-{children}
-
-</main>
+  {/* CONTENIDO */}
+  <main className="flex-1 p-8">
+    {children}
+  </main>
 
 </div>
 
