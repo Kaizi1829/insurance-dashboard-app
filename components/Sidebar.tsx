@@ -56,46 +56,31 @@ Control comercial
 </div>
 
 {/* MENU */}
-
 <nav className="flex flex-col gap-2">
+  {menu.map((item: any) => {
+    const Icon = item.icon
+    const active = pathname === item.href
 
-{menu.map((item)=>{
-
-const Icon = item.icon
-const active = pathname === item.href
-
-return(
-
-<Link
-  key={item.href}
-  href={item.href as unknown as string}
-  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition
-  ${activo ? "bg-[#003A8F] text-white" : ""}
-`}
->
-
-<Icon size={18}/>
-{item.name}
-
-</Link>
-
-)
-
-})}
-
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition
+        ${active ? "bg-[#003A8F] text-white" : ""}`}
+      >
+        <Icon size={18} />
+        <span>{item.label}</span>
+      </Link>
+    )
+  })}
 </nav>
 
 {/* FOOTER */}
-
 <div className="mt-auto pt-6 border-t text-xs text-slate-400">
-
-<p>Panel comercial</p>
-<p>Agencia AXA</p>
-
+  <p>Panel comercial</p>
+  <p>Agencia AXA</p>
 </div>
 
 </div>
-
 )
-
 }
