@@ -68,8 +68,7 @@ return(
 
 <Link
 key={item.href}
-href={item.href}
-href={item.href as string}
+href={`${item.href}`}
 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition
 ${active
 ? "bg-[#003A8F] text-white"
