@@ -62,15 +62,15 @@ Control comercial
     const active = pathname === item.href
 
     return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition
-        ${active ? "bg-[#003A8F] text-white" : ""}`}
-      >
-        <Icon size={18} />
-        <span>{item.label}</span>
-      </Link>
+<Link
+  key={item.href}
+  href={item.href}
+  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition w-full
+  ${active ? "bg-[#003A8F] text-white" : "text-slate-700 hover:bg-slate-100"}`}
+>
+  <Icon size={18} />
+  <span className="font-medium">{item.label}</span>
+</Link>
     )
   })}
 </nav>
