@@ -1,0 +1,43 @@
+{
+  "2026": {
+    "rapelAnual": {
+      "crecimientoMin": 0.1,
+      "devolucionesMax": 2,
+      "saludMin": 8000,
+      "vidaMin": 8000
+    },
+    "grados": {
+      "salud": 20000,
+      "empresa": 40000,
+      "vida": 12000,
+      "ahorro": 100000,
+      "psc": 12000
+    },
+    "rapelCuatrimestral": {
+      "1": {
+        "salud": 3501,
+        "psc": 2000,
+        "empresa": 16734,
+        "particulares": 56204,
+        "ahorro": 30000,
+        "vida": 2000
+      },
+      "2": {
+        "salud": 0,
+        "psc": 0,
+        "empresa": 0,
+        "particulares": 0,
+        "ahorro": 0,
+        "vida": 0
+      },
+      "3": {
+        "salud": 0,
+        "psc": 0,
+        "empresa": 0,
+        "particulares": 0,
+        "ahorro": 0,
+        "vida": 0
+      }
+    }
+  }
+}

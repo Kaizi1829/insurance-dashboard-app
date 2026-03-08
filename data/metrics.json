@@ -1,0 +1,290 @@
+[
+  {
+    "year": 2026,
+    "month": "Enero",
+    "mediatorCode": "GLOBAL",
+    "medofis": {
+      "gwp": 171885,
+      "crecimientoPct": 3.7,
+      "renovacionPct": 93.2,
+      "tasaNpPct": 10.5,
+      "cor": 0,
+      "devolucionesPct": 1.2
+    },
+    "cartera": {
+      "particulares": {
+        "auto": 50,
+        "hogar": 50,
+        "comunidades": 50,
+        "decesos": 0,
+        "rc": 0,
+        "salud": 0,
+        "total": 150
+      },
+      "empresa": {
+        "rc": 100,
+        "flotas": 100,
+        "comercio": 0,
+        "oficina": 0,
+        "industria": 0,
+        "transporte": 0,
+        "total": 200
+      },
+      "vida": {
+        "individual": 0,
+        "ahorro": 0
+      },
+      "psc": {
+        "vida": 0,
+        "salud": 0,
+        "total": 0
+      }
+    },
+    "produccion": {
+      "particulares": {
+        "auto": 50,
+        "hogar": 50,
+        "comunidades": 50,
+        "decesos": 0,
+        "rc": 0,
+        "salud": 0,
+        "total": 250
+      },
+      "empresa": {
+        "rc": 0,
+        "flotas": 0,
+        "comercio": 0,
+        "oficina": 0,
+        "industria": 0,
+        "transporte": 0,
+        "total": 0
+      },
+      "vida": {
+        "individual": 0,
+        "ahorro": 0
+      },
+      "psc": {
+        "vida": 0,
+        "salud": 0,
+        "total": 0
+      }
+    }
+  },
+  [
+    {
+      "year": 2026,
+      "month": "Enero",
+      "mediatorCode": "GLOBAL",
+      "medofis": {
+        "gwp": 171885,
+        "crecimientoPct": 3.7,
+        "renovacionPct": 93.2,
+        "tasaNpPct": 10.5,
+        "cor": 0,
+        "devolucionesPct": 1.2
+      },
+      "cartera": {
+        "particularesAccind": 0,
+        "particularesOtrosRamos": 0,
+        "particularesRestoAuto": 0,
+        "particularesComunidades": 0,
+        "particularesDecesos": 0,
+        "particularesEmbRecreo": 0,
+        "particularesHogarDirecto": 0,
+        "particularesHogarMediado": 0,
+        "particularesIncrpart": 0,
+        "particularesRccaza": 0,
+        "particularesRcpar": 0,
+        "particularesVarios": 0,
+        "empresasAcccol": 0,
+        "empresasFlotas": 0,
+        "empresasComercio": 0,
+        "empresasIndustria": 0,
+        "empresasOtrosIng": 0,
+        "empresasOficinas": 0,
+        "empresasRcemp": 0,
+        "empresasRestoTransportes": 0,
+        "saludSaludcol": 0,
+        "saludSaludind": 0,
+        "vidaIndividualPureProtection": 0,
+        "vidaIndividualProtectionWs": 0,
+        "vidaIndividualGeneralAccount": 0,
+        "vidaIndividualUnitLinked": 0,
+        "vidaColectivoPureProtection": 0,
+        "vidaColectivoGeneralAccount": 0
+      },
+      "produccion": {
+        "particularesAccind": 0,
+        "particularesOtrosRamos": 0,
+        "particularesRestoAuto": 0,
+        "particularesComunidades": 0,
+        "particularesDecesos": 0,
+        "particularesEmbRecreo": 0,
+        "particularesHogarDirecto": 0,
+        "particularesHogarMediado": 0,
+        "particularesIncrpart": 0,
+        "particularesRccaza": 0,
+        "particularesRcpar": 0,
+        "particularesVarios": 0,
+        "empresasAcccol": 0,
+        "empresasFlotas": 0,
+        "empresasComercio": 0,
+        "empresasIndustria": 0,
+        "empresasOtrosIng": 0,
+        "empresasOficinas": 0,
+        "empresasRcemp": 0,
+        "empresasRestoTransportes": 0,
+        "saludSaludcol": 0,
+        "saludSaludind": 0,
+        "vidaIndividualPureProtection": 0,
+        "vidaIndividualProtectionWs": 0,
+        "vidaIndividualGeneralAccount": 0,
+        "vidaIndividualUnitLinked": 0,
+        "vidaColectivoPureProtection": 0,
+        "vidaColectivoGeneralAccount": 0
+      }
+    }
+  ],
+  {
+    "year": 2026,
+    "month": "Febrero",
+    "mediatorCode": "GLOBAL",
+    "medofis": {
+      "gwp": 300963,
+      "crecimientoPct": 9.1,
+      "renovacionPct": 96.4,
+      "tasaNpPct": 12.7,
+      "cor": 0,
+      "devolucionesPct": 1.5
+    },
+    "cartera": {
+      "particulares": {
+        "auto": 200,
+        "hogar": 300,
+        "comunidades": 0,
+        "decesos": 0,
+        "rc": 0,
+        "salud": 0,
+        "total": 500
+      },
+      "empresa": {
+        "rc": 10,
+        "flotas": 10,
+        "comercio": 10,
+        "oficina": 0,
+        "industria": 0,
+        "transporte": 0,
+        "total": 300
+      },
+      "vida": {
+        "individual": 0,
+        "ahorro": 0
+      },
+      "psc": {
+        "vida": 0,
+        "salud": 0,
+        "total": 0
+      }
+    },
+    "produccion": {
+      "particulares": {
+        "auto": 300,
+        "hogar": 20,
+        "comunidades": 0,
+        "decesos": 0,
+        "rc": 0,
+        "salud": 0,
+        "total": 320
+      },
+      "empresa": {
+        "rc": 0,
+        "flotas": 0,
+        "comercio": 0,
+        "oficina": 0,
+        "industria": 0,
+        "transporte": 0,
+        "total": 0
+      },
+      "vida": {
+        "individual": 100,
+        "ahorro": 30000
+      },
+      "psc": {
+        "vida": 0,
+        "salud": 0,
+        "total": 600
+      }
+    }
+  },
+  {
+    "year": 2025,
+    "month": "Enero",
+    "mediatorCode": "GLOBAL",
+    "medofis": {
+      "gwp": 10,
+      "crecimientoPct": 10,
+      "renovacionPct": 10,
+      "tasaNpPct": 0,
+      "cor": 0,
+      "devolucionesPct": 0
+    },
+    "cartera": {
+      "particulares": {
+        "auto": 0,
+        "hogar": 0,
+        "comunidades": 0,
+        "decesos": 0,
+        "rc": 0,
+        "salud": 0,
+        "total": 0
+      },
+      "empresa": {
+        "rc": 0,
+        "flotas": 0,
+        "comercio": 0,
+        "oficina": 0,
+        "industria": 0,
+        "transporte": 0,
+        "total": 0
+      },
+      "vida": {
+        "individual": 0,
+        "ahorro": 0
+      },
+      "psc": {
+        "vida": 0,
+        "salud": 0,
+        "total": 0
+      }
+    },
+    "produccion": {
+      "particulares": {
+        "auto": 0,
+        "hogar": 0,
+        "comunidades": 0,
+        "decesos": 0,
+        "rc": 0,
+        "salud": 0,
+        "total": 0
+      },
+      "empresa": {
+        "rc": 0,
+        "flotas": 0,
+        "comercio": 0,
+        "oficina": 0,
+        "industria": 0,
+        "transporte": 0,
+        "total": 0
+      },
+      "vida": {
+        "individual": 0,
+        "ahorro": 0
+      },
+      "psc": {
+        "vida": 0,
+        "salud": 0,
+        "total": 0
+      }
+    }
+  }
+]
