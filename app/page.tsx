@@ -302,8 +302,8 @@ export default function HomePage() {
 
       {/* CARTERA + PRODUCCION */}
 
-      <section className="grid xl:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl p-6 border">
+      <section className="grid xl:grid-cols-3 gap-8">
+        <div className="bg-white rounded-2xl p-6 border xl:col-span-1">
           <h3 className="font-semibold mb-4">Composición de cartera</h3>
 
           <div className="h-80">
@@ -329,7 +329,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 border">
+        <div className="bg-white rounded-2xl p-6 border xl:col-span-2">
           <h3 className="font-semibold mb-4">Análisis de producción</h3>
 
           <div className="grid md:grid-cols-4 gap-8">
