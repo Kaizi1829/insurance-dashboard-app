@@ -204,110 +204,112 @@ export default function RegistroPage() {
     }
   }
 
-  async function guardar() {
-    try {
-      setSaving(true)
+async function guardar() {
+  try {
+    setSaving(true)
 
-      const payload = {
-        year,
-        month,
-        mediatorCode,
+    const payload = {
+      year,
+      month,
+      mediatorCode,
 
-        medofis: {
-          gwp: toNumber(form.gwp),
-          crecimientoPct: toNumber(form.crecimientoPct),
-          renovacionPct: toNumber(form.renovacionPct),
-          tasaNpPct: toNumber(form.tasaNpPct),
-          cor: toNumber(form.cor),
-          devolucionesPct: toNumber(form.devolucionesPct),
+      medofis: {
+        gwp: toNumber(form.gwp),
+        crecimientoPct: toNumber(form.crecimientoPct),
+        renovacionPct: toNumber(form.renovacionPct),
+        tasaNpPct: toNumber(form.tasaNpPct),
+        cor: toNumber(form.cor),
+        devolucionesPct: toNumber(form.devolucionesPct),
+      },
+
+      cartera: {
+        particulares: {
+          auto: toNumber(form.cartera_auto),
+          hogar: toNumber(form.cartera_hogar),
+          comunidades: toNumber(form.cartera_comunidades),
+          decesos: toNumber(form.cartera_decesos),
+          rc: toNumber(form.cartera_rc_part),
+          salud: toNumber(form.cartera_salud_ind),
+          total: toNumber(form.cartera_part_total),
         },
 
-        cartera: {
-          particulares: {
-            auto: toNumber(form.cartera_auto),
-            hogar: toNumber(form.cartera_hogar),
-            comunidades: toNumber(form.cartera_comunidades),
-            decesos: toNumber(form.cartera_decesos),
-            rc: toNumber(form.cartera_rc_part),
-            salud: toNumber(form.cartera_salud_ind),
-            total: toNumber(form.cartera_part_total),
-          },
-
-          empresa: {
-            rc: toNumber(form.cartera_rc_emp),
-            flotas: toNumber(form.cartera_flotas),
-            comercio: toNumber(form.cartera_comercio),
-            oficina: toNumber(form.cartera_oficina),
-            industria: toNumber(form.cartera_industria),
-            transporte: toNumber(form.cartera_transporte),
-            total: toNumber(form.cartera_emp_total),
-          },
-
-          vida: {
-            individual: toNumber(form.cartera_vida_ind),
-            ahorro: toNumber(form.cartera_ahorro),
-          },
-
-          psc: {
-            vida: toNumber(form.cartera_vida_col),
-            salud: toNumber(form.cartera_salud_col),
-            total: toNumber(form.cartera_psc_total),
-          },
+        empresa: {
+          rc: toNumber(form.cartera_rc_emp),
+          flotas: toNumber(form.cartera_flotas),
+          comercio: toNumber(form.cartera_comercio),
+          oficina: toNumber(form.cartera_oficina),
+          industria: toNumber(form.cartera_industria),
+          transporte: toNumber(form.cartera_transporte),
+          total: toNumber(form.cartera_emp_total),
         },
 
-        produccion: {
-          particulares: {
-            auto: toNumber(form.prod_auto),
-            hogar: toNumber(form.prod_hogar),
-            comunidades: toNumber(form.prod_comunidades),
-            decesos: toNumber(form.prod_decesos),
-            rc: toNumber(form.prod_rc_part),
-            salud: toNumber(form.prod_salud_ind),
-            total: toNumber(form.prod_part_total),
-          },
-
-          empresa: {
-            rc: toNumber(form.prod_rc_emp),
-            flotas: toNumber(form.prod_flotas),
-            comercio: toNumber(form.prod_comercio),
-            oficina: toNumber(form.prod_oficina),
-            industria: toNumber(form.prod_industria),
-            transporte: toNumber(form.prod_transporte),
-            total: toNumber(form.prod_emp_total),
-          },
-
-          vida: {
-            individual: toNumber(form.prod_vida_ind),
-            ahorro: toNumber(form.prod_ahorro),
-          },
-
-          psc: {
-            vida: toNumber(form.prod_vida_col),
-            salud: toNumber(form.prod_salud_col),
-            total: toNumber(form.prod_psc_total),
-          },
+        vida: {
+          individual: toNumber(form.cartera_vida_ind),
+          ahorro: toNumber(form.cartera_ahorro),
         },
-      }
 
-      const res = await fetch("/api/metrics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
+        psc: {
+          vida: toNumber(form.cartera_vida_col),
+          salud: toNumber(form.cartera_salud_col),
+          total: toNumber(form.cartera_psc_total),
+        },
+      },
 
-      if (!res.ok) {
-        throw new Error("No se pudo guardar el registro")
-      }
+      produccion: {
+        particulares: {
+          auto: toNumber(form.prod_auto),
+          hogar: toNumber(form.prod_hogar),
+          comunidades: toNumber(form.prod_comunidades),
+          decesos: toNumber(form.prod_decesos),
+          rc: toNumber(form.prod_rc_part),
+          salud: toNumber(form.prod_salud_ind),
+          total: toNumber(form.prod_part_total),
+        },
 
-      alert("ARGOS guardado")
-      window.dispatchEvent(new Event("metricsUpdated"))
-    } catch (error) {
-      console.error(error)
-      alert("Ha habido un error al guardar el ARGOS")
-    } finally {
-      setSaving(false)
+        empresa: {
+          rc: toNumber(form.prod_rc_emp),
+          flotas: toNumber(form.prod_flotas),
+          comercio: toNumber(form.prod_comercio),
+          oficina: toNumber(form.prod_oficina),
+          industria: toNumber(form.prod_industria),
+          transporte: toNumber(form.prod_transporte),
+          total: toNumber(form.prod_emp_total),
+        },
+
+        vida: {
+          individual: toNumber(form.prod_vida_ind),
+          ahorro: toNumber(form.prod_ahorro),
+        },
+
+        psc: {
+          vida: toNumber(form.prod_vida_col),
+          salud: toNumber(form.prod_salud_col),
+          total: toNumber(form.prod_psc_total),
+        },
+      },
     }
+
+    const res = await fetch("/api/metrics", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (!res.ok) {
+      throw new Error("No se pudo guardar el registro")
+    }
+
+    alert("ARGOS guardado")
+    window.dispatchEvent(new Event("metricsUpdated"))
+  } catch (error) {
+    console.error(error)
+    alert("Ha habido un error al guardar el ARGOS")
+  } finally {
+    setSaving(false)
   }
+}
 
   return (
     <div className="space-y-8">
