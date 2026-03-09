@@ -1,68 +1,31 @@
 import { NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
 
-const filePath = path.join(process.cwd(), "data", "metrics.json")
-
-function readMetrics() {
-
-  try {
-
-    const data = fs.readFileSync(filePath, "utf8")
-
-    if (!data) return []
-
-    const parsed = JSON.parse(data)
-
-    if (!Array.isArray(parsed)) return []
-
-    return parsed
-
-  } catch {
-
-    return []
-
-  }
-
-}
-
-
+let metrics: any[] = []
 
 export async function GET() {
-
-  const metrics = readMetrics()
-
   return NextResponse.json(metrics)
-
 }
 
-
-
 export async function POST(request: Request) {
+  try {
+    const newData = await request.json()
 
-  const newData = await request.json()
+    const index = metrics.findIndex(
+      (m) =>
+        m.year === newData.year &&
+        m.month === newData.month &&
+        m.mediatorCode === newData.mediatorCode
+    )
 
-  const metrics = readMetrics()
+    if (index >= 0) {
+      metrics[index] = newData
+    } else {
+      metrics.push(newData)
+    }
 
-  const index = metrics.findIndex(
-    (m: any) =>
-      m.year === newData.year &&
-      m.month === newData.month &&
-      m.mediatorCode === newData.mediatorCode
-  )
-
-  if (index >= 0) {
-
-    metrics[index] = newData
-
-  } else {
-
-    metrics.push(newData)
-
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error("Error guardando:", error)
+    return NextResponse.json({ ok: false }, { status: 500 })
   }
-
-  fs.writeFileSync(filePath, JSON.stringify(metrics, null, 2))
-
-  return NextResponse.json({ ok: true })
-
 }
