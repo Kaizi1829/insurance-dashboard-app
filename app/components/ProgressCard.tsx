@@ -15,23 +15,70 @@ export default function ProgressCard({
   mode?: Mode
   suffix?: string
 }) {
-  const hasObjective = objetivo > 0
+  const isPercent = suffix === "%"
+
+  const hasObjective = objetivo > 0 || (mode === "min" && objetivo === 0)
 
   const conseguido = hasObjective
     ? mode === "max"
       ? actual <= objetivo
-      : actual >= objetivo
+      : objetivo === 0
+        ? actual > 0
+        : actual >= objetivo
     : false
 
   let pct = 0
 
   if (hasObjective) {
-    pct = Math.round((actual / objetivo) * 100)
+    if (mode === "max") {
+      if (actual <= objetivo) {
+        pct = 100
+      } else if (actual > 0) {
+        pct = Math.round((objetivo / actual) * 100)
+      } else {
+        pct = 0
+      }
+    } else {
+      if (objetivo === 0) {
+        pct = actual > 0 ? 100 : 0
+      } else {
+        pct = Math.round((actual / objetivo) * 100)
+      }
+    }
+
     pct = Math.max(0, Math.min(pct, 100))
   }
 
-  function formatValue(value: number) {
-    return `${value.toLocaleString("es-ES")} ${suffix}`
+  function formatValue(value: number | string) {
+    const n = Number(value)
+
+    if (Number.isNaN(n)) {
+      return isPercent ? "0%" : "0 €"
+    }
+
+    const sign = n < 0 ? "-" : ""
+    const abs = Math.abs(n)
+
+    if (isPercent) {
+      const [integerPart, decimalPart] = abs.toFixed(2).split(".")
+      const integerWithDots = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+
+      let formatted = sign + integerWithDots
+
+      if (decimalPart !== "00") {
+        const trimmedDecimals = decimalPart.replace(/0+$/, "")
+        formatted = trimmedDecimals
+          ? `${sign}${integerWithDots},${trimmedDecimals}`
+          : sign + integerWithDots
+      }
+
+      return `${formatted}%`
+    }
+
+    const [integerPart] = abs.toFixed(0).split(".")
+    const integerWithDots = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+
+    return `${sign}${integerWithDots} €`
   }
 
   return (
@@ -47,7 +94,7 @@ export default function ProgressCard({
                 : "bg-red-100 text-red-700"
             }`}
           >
-            {conseguido ? "Conseguido" : "No conseguido"}
+            {conseguido ? "Cumplido" : "No cumplido"}
           </span>
         ) : (
           <span className="text-xs px-2 py-1 rounded-full whitespace-nowrap bg-slate-100 text-slate-500">

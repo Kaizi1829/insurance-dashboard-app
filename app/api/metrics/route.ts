@@ -1,31 +1,73 @@
 import { NextResponse } from "next/server"
-
-let metrics: any[] = []
+import { supabaseServer } from "@/lib/supabaseServer"
 
 export async function GET() {
-  return NextResponse.json(metrics)
+  const { data, error } = await supabaseServer
+    .from("metrics")
+    .select("*")
+
+  if (error) {
+    console.error(error)
+    return NextResponse.json([])
+  }
+
+  const formatted = data.map((m) => ({
+    year: m.year,
+    month: m.month,
+    monthNumber: m.month,
+    mediatorCode: m.mediator_code,
+    medofis: m.medofis,
+    cartera: m.cartera,
+    produccion: m.produccion,
+  }))
+
+  return NextResponse.json(formatted)
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const newData = await request.json()
+    const body = await req.json()
 
-    const index = metrics.findIndex(
-      (m) =>
-        m.year === newData.year &&
-        m.month === newData.month &&
-        m.mediatorCode === newData.mediatorCode
-    )
+    const {
+      year,
+      month,
+      mediatorCode,
+      medofis,
+      cartera,
+      produccion,
+    } = body
 
-    if (index >= 0) {
-      metrics[index] = newData
-    } else {
-      metrics.push(newData)
+    const { data: existing } = await supabaseServer
+      .from("metrics")
+      .select("*")
+      .eq("year", Number(year))
+      .eq("month", Number(month))
+      .eq("mediator_code", mediatorCode)
+      .maybeSingle()
+
+    const payload = {
+      year: Number(year),
+      month: Number(month),
+      mediator_code: mediatorCode,
+      medofis: medofis ?? existing?.medofis ?? {},
+      cartera: cartera ?? existing?.cartera ?? {},
+      produccion: produccion ?? existing?.produccion ?? {},
+    }
+
+    const { error } = await supabaseServer
+      .from("metrics")
+      .upsert(payload, {
+        onConflict: "year,month,mediator_code",
+      })
+
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ ok: false }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error("Error guardando:", error)
+  } catch (e) {
+    console.error(e)
     return NextResponse.json({ ok: false }, { status: 500 })
   }
 }

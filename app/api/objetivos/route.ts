@@ -1,22 +1,39 @@
-import { NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
+import { NextRequest, NextResponse } from "next/server"
+import { getObjetivosByYear, objetivosPorAno } from "@/lib/objetivos"
 
-const filePath = path.join(process.cwd(),"data","objetivos.json")
+export async function GET(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams
+    const yearParam = searchParams.get("year")
 
-export async function GET(){
+    if (yearParam) {
+      const year = Number(yearParam)
 
-const file = fs.readFileSync(filePath,"utf8")
-return NextResponse.json(JSON.parse(file))
+      if (isNaN(year)) {
+        return NextResponse.json(
+          { ok: false, error: "El año no es válido" },
+          { status: 400 }
+        )
+      }
 
+      return NextResponse.json(getObjetivosByYear(year))
+    }
+
+    return NextResponse.json(objetivosPorAno)
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Error al leer objetivos" },
+      { status: 500 }
+    )
+  }
 }
 
-export async function POST(req:any){
-
-const body = await req.json()
-
-fs.writeFileSync(filePath,JSON.stringify(body,null,2))
-
-return NextResponse.json({ok:true})
-
+export async function POST() {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Los objetivos están definidos en código y no se guardan desde la web.",
+    },
+    { status: 405 }
+  )
 }

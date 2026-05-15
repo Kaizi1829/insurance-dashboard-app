@@ -14,6 +14,21 @@ const fields = [
 'COR'
 ]
 
+const monthEnum: Record<string, number> = {
+Enero: 1,
+Febrero: 2,
+Marzo: 3,
+Abril: 4,
+Mayo: 5,
+Junio: 6,
+Julio: 7,
+Agosto: 8,
+Septiembre: 9,
+Octubre: 10,
+Noviembre: 11,
+Diciembre: 12
+}
+
 export default function DataPage(){
 
 const [year,setYear] = useState(2026)
@@ -24,12 +39,11 @@ const [formData,setFormData] = useState<any>({})
 const handleChange=(field:string,value:string)=>{
 setFormData({...formData,[field]:value})
 }
-
+const selectedMonth = monthEnum[month]
 const handleSubmit = async () => {
-
 const payload = {
 year,
-month,
+month: selectedMonth,
 mediatorCode: mediator,
 renovacionPct:Number(formData["Renovación (%)"]),
 tasaNpPct:Number(formData["Tasa NP (%)"]),

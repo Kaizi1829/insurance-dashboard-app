@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation"
 import type { Route } from "next"
 import {
   LayoutDashboard,
-  Database,
-  Building2,
+  TrendingUp,
+  ClipboardList,
   Target,
-  type LucideIcon
+  type LucideIcon,
 } from "lucide-react"
 
 type MenuItem = {
@@ -17,26 +17,46 @@ type MenuItem = {
   icon: LucideIcon
 }
 
-const menu: MenuItem[] = [
+type MenuGroup = {
+  title: string
+  items: MenuItem[]
+}
+
+const menuGroups: MenuGroup[] = [
   {
-    label: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
-  },
+  title: "Análisis",
+  items: [
+    {
+      label: "Panel principal",
+      href: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      label: "Evolución anual",
+      href: "/medofis",
+      icon: TrendingUp,
+    },
+    {
+      label: "Seguimiento de objetivos",
+      href: "/seguimiento" as Route,
+      icon: Target,
+    },
+  ],
+},
   {
-    label: "Registro ARGOS",
-    href: "/registro",
-    icon: Database,
-  },
-  {
-    label: "Medofis",
-    href: "/medofis",
-    icon: Building2,
-  },
-  {
-    label: "Objetivos",
-    href: "/objetivos",
-    icon: Target,
+    title: "Registro",
+    items: [
+      {
+        label: "ARGOS",
+        href: "/registro",
+        icon: ClipboardList,
+      },
+      {
+        label: "Objetivos",
+        href: "/objetivos",
+        icon: Target,
+      },
+    ],
   },
 ]
 
@@ -50,26 +70,36 @@ export default function Sidebar() {
         <p className="text-xs text-slate-400">Control comercial</p>
       </div>
 
-      <nav className="flex flex-col gap-2">
-        {menu.map((item) => {
-          const Icon = item.icon
-          const active = pathname === item.href
+      <nav className="flex flex-col gap-8">
+        {menuGroups.map((group) => (
+          <div key={group.title}>
+            <p className="px-2 mb-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              {group.title}
+            </p>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition w-full ${
-                active
-                  ? "bg-[#003A8F] text-white"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              <Icon size={18} />
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          )
-        })}
+            <div className="flex flex-col gap-2">
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const active = pathname === item.href
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition w-full ${
+                      active
+                        ? "bg-[#003A8F] text-white"
+                        : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span className="font-medium">{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="mt-auto pt-6 border-t text-xs text-slate-400">
