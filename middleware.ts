@@ -7,6 +7,8 @@ export function middleware(req: NextRequest) {
   const isPublicPath =
     pathname === "/login" ||
     pathname === "/api/login" ||
+    pathname === "/api/argos" ||
+    pathname.startsWith("/api/argos?") ||
     pathname.startsWith("/_next/static") ||
     pathname.startsWith("/_next/image") ||
     pathname === "/favicon.ico"
