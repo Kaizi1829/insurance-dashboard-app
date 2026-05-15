@@ -56,9 +56,13 @@ const menuGroups: MenuGroup[] = [
         href: "/objetivos",
         icon: Target,
       },
+      {
+        label: "ARGOS Real",
+        href: "/argos" as Route,
+        icon: LayoutDashboard,
+      },
     ],
   },
-]
 
 export default function Sidebar() {
   const pathname = usePathname()
