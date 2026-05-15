@@ -1,5 +1,3 @@
-// v2
-import { NextRequest, NextResponse } from 'next/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -20,21 +18,20 @@ async function query(table: string, params: Record<string, string>) {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const year    = searchParams.get('year')   || '2026'
-  const month   = searchParams.get('month')  || '3'
-  const medor   = searchParams.get('medor')  || '742776'
+  const year    = searchParams.get('year')    || '2026'
+  const month   = searchParams.get('month')   || '3'
+  const medor   = searchParams.get('medor')   || '742776'
   const medofis = searchParams.get('medofis') || null
-  const tipo    = searchParams.get('tipo')   || 'novida'
+  const tipo    = searchParams.get('tipo')    || 'novida'
 
   try {
     if (tipo === 'vida') {
-      const params: Record<string, string> = {
+      const data = await query('argos_vida', {
         year: `eq.${year}`,
         month: `eq.${month}`,
         medor_code: `eq.${medor}`,
         order: 'negocio',
-      }
-      const data = await query('argos_vida', params)
+      })
       return NextResponse.json({ tipo: 'vida', year, month, medor, data })
     }
 
