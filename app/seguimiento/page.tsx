@@ -186,7 +186,7 @@ export default function SeguimientoObjetivosPage() {
 
     const crecimientoReal = toNumber(lastMetric?.medofis?.crecimientoPct)
     const devolucionesReal = toNumber(lastMetric?.medofis?.devolucionesPct)
-    const saludReal = toNumber(lastMetric?.produccion?.particulares?.salud)
+    const saludReal = toNumber(lastMetric?.produccion?.salud?.total)
     const vidaReal = toNumber(lastMetric?.produccion?.vida?.individual)
 
     return [
@@ -237,7 +237,7 @@ export default function SeguimientoObjetivosPage() {
     const vidaMeta = toNumber(objetivos?.grados?.vida)
     const pscMeta = toNumber(objetivos?.grados?.psc)
 
-    const saludReal = toNumber(lastMetric?.produccion?.particulares?.salud)
+    const saludReal = toNumber(lastMetric?.produccion?.salud?.total)
     const empresaReal = toNumber(lastMetric?.produccion?.empresa?.total)
     const vidaReal = toNumber(lastMetric?.produccion?.vida?.individual)
     const pscReal = toNumber(lastMetric?.produccion?.psc?.total)
@@ -348,17 +348,17 @@ export default function SeguimientoObjetivosPage() {
       {
         label: "Salud",
         meta: toNumber(quarterGoals?.salud),
-        real: toNumber(lastMetric?.produccion?.particulares?.salud),
+        real: toNumber(lastMetric?.produccion?.salud?.total),
         cumplimiento: getCumplimiento(
-          toNumber(lastMetric?.produccion?.particulares?.salud),
+          toNumber(lastMetric?.produccion?.salud?.total),
           toNumber(quarterGoals?.salud)
         ),
         falta: getFalta(
-          toNumber(lastMetric?.produccion?.particulares?.salud),
+          toNumber(lastMetric?.produccion?.salud?.total),
           toNumber(quarterGoals?.salud)
         ),
         estado: getEstado(
-          toNumber(lastMetric?.produccion?.particulares?.salud),
+          toNumber(lastMetric?.produccion?.salud?.total),
           toNumber(quarterGoals?.salud),
           { devengaLabel: true }
         ),
