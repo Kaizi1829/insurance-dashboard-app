@@ -403,8 +403,7 @@ function DataTable({ cols, rows, stickyCount, stickyColWidths, isTotalRow, empty
               <th
                 key={col.key}
                 style={{
-                  // sticky header th = z-50 (highest), normal header th = z-40
-                  position: isSticky ? 'sticky' : 'sticky',
+                  position: 'sticky',
                   top: 0,
                   left: isSticky ? stickyLeft[i] : undefined,
                   zIndex: isSticky ? 50 : 40,
@@ -419,8 +418,9 @@ function DataTable({ cols, rows, stickyCount, stickyColWidths, isTotalRow, empty
                   textAlign: isNumeric ? 'right' : 'left',
                   borderRight: isLastSticky ? STICKY_SEPARATOR : `1px solid ${HEADER_BORDER}`,
                   borderBottom: `2px solid rgba(255,255,255,0.2)`,
-                  // Prevent bleed-through: explicit bg on the element
                   boxShadow: isLastSticky ? '4px 0 8px rgba(0,0,0,0.08)' : undefined,
+                  // minWidth ensures sticky offset is always correct regardless of content length
+                  minWidth: isSticky ? stickyColWidths[i] : undefined,
                 }}
               >
                 {col.label}
@@ -466,21 +466,20 @@ function DataTable({ cols, rows, stickyCount, stickyColWidths, isTotalRow, empty
                       style={{
                         // CRITICAL: always set explicit backgroundColor — never inherit from <tr>
                         backgroundColor: baseBg,
-                        // sticky data td = z-20, normal data td = z-0
                         position: isSticky ? 'sticky' : undefined,
                         left: isSticky ? stickyLeft[i] : undefined,
-                        zIndex: isSticky ? 20 : 0,
+                        zIndex: isSticky ? 20 : undefined,
                         padding: '7px 12px',
                         whiteSpace: 'nowrap',
                         textAlign: isNumeric ? 'right' : 'left',
                         color: total ? '#0f172a' : '#334155',
                         fontWeight: total ? 600 : 400,
                         height: '36px',
-                        // Row bottom border
                         borderBottom: `1px solid ${ROW_BORDER}`,
-                        // Column separator for sticky last col
                         borderRight: isLastSticky ? STICKY_SEPARATOR : '1px solid #f1f5f9',
                         boxShadow: isLastSticky ? '4px 0 8px rgba(0,0,0,0.05)' : undefined,
+                        // minWidth ensures offset is always valid regardless of text length
+                        minWidth: isSticky ? stickyColWidths[i] : undefined,
                       }}
                     >
                       {renderCell(col, row[col.key], total)}
