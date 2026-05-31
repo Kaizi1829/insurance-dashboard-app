@@ -9,10 +9,9 @@ type Row = Record<string, any>
 const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-const YEARS = [2024, 2025, 2026, 2027]
-const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
-
 const ALL_MEDOFIS = ['MEDOR', '742776', '742826', '742821', '755224']
+
+type Period = { year: number; month: number }
 
 const LOB_ORDER: Record<string, number> = {
   PARTICULARES: 1,
@@ -497,15 +496,33 @@ function DataTable({ cols, rows, stickyCount, stickyColWidths, isTotalRow, empty
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ArgosPage() {
-  const [year, setYear] = useState(2026)
-  const [month, setMonth] = useState(3)
+  const [year, setYear] = useState(0)
+  const [month, setMonth] = useState(0)
   const [medofis, setMedofis] = useState('MEDOR')
   const [nvData, setNvData] = useState<Row[]>([])
   const [vData, setVData] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const [lob, setLob] = useState<LobTab>('PARTICULARES')
+  const [periods, setPeriods] = useState<Period[]>([])
 
+  // Cargar períodos disponibles al montar
   useEffect(() => {
+    fetch('/api/available-periods')
+      .then(r => r.json())
+      .then(data => {
+        const available: Period[] = data.argos?.periods ?? []
+        setPeriods(available)
+        if (available.length > 0) {
+          setYear(available[0].year)
+          setMonth(available[0].month)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Cargar datos cuando cambia año, mes o medofis
+  useEffect(() => {
+    if (!year || !month) return
     setLoading(true)
     const base = `/api/argos?year=${year}&month=${month}&medor=742776`
     const medofisParam = medofis === 'MEDOR' ? 'TOTAL' : medofis
@@ -518,6 +535,13 @@ export default function ArgosPage() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [year, month, medofis])
+
+  // Años y meses disponibles (solo los que tienen datos)
+  const availableYears = [...new Set(periods.map(p => p.year))].sort((a, b) => b - a)
+  const availableMonths = periods
+    .filter(p => p.year === year)
+    .map(p => p.month)
+    .sort((a, b) => b - a)
 
   // Aggregate rows for the selected LOB tab
   const displayNvRows: Row[] = (() => {
@@ -585,16 +609,22 @@ export default function ArgosPage() {
           {/* Año */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <label style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Año</label>
-            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selectStyle}>
-              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            <select value={year} onChange={e => {
+              const y = Number(e.target.value)
+              setYear(y)
+              // Auto-select latest month for this year
+              const firstMonth = periods.filter(p => p.year === y).sort((a,b) => b.month - a.month)[0]
+              if (firstMonth) setMonth(firstMonth.month)
+            }} style={selectStyle}>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
 
-          {/* Mes */}
+          {/* Mes — solo los disponibles */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <label style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mes</label>
             <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selectStyle, minWidth: '130px' }}>
-              {MONTHS.map(m => <option key={m} value={m}>{MESES[m]}</option>)}
+              {availableMonths.map(m => <option key={m} value={m}>{MESES[m]}</option>)}
             </select>
           </div>
 

@@ -110,7 +110,7 @@ function getQuarterLabel(month: number) {
 }
 
 export default function SeguimientoObjetivosPage() {
-  const [year, setYear] = useState(2026)
+  const [year, setYear] = useState(0)
   const [metrics, setMetrics] = useState<any[]>([])
   const [objetivos, setObjetivos] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -120,9 +120,18 @@ export default function SeguimientoObjetivosPage() {
       try {
         setLoading(true)
 
+        // Auto-detectar el último año con datos si aún no hay año seleccionado
+        let activeYear = year
+        if (!activeYear) {
+          const periodsRes = await fetch("/api/available-periods")
+          const periodsJson = await periodsRes.json()
+          activeYear = periodsJson?.metrics?.latest?.year ?? 2026
+          setYear(activeYear)
+        }
+
         const [metricsRes, objetivosRes] = await Promise.all([
           fetch("/api/metrics"),
-          fetch(`/api/objetivos?year=${year}`),
+          fetch(`/api/objetivos?year=${activeYear}`),
         ])
 
         const metricsJson = await metricsRes.json()

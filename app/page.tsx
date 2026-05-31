@@ -119,7 +119,7 @@ function getValueByPath(source: any, path: string) {
 }
 
 export default function HomePage() {
-  const [year, setYear] = useState(2026)
+  const [year, setYear] = useState(0)
   const [metrics, setMetrics] = useState<any[]>([])
   const [data, setData] = useState<any>(null)
   const [previousData, setPreviousData] = useState<any>(null)
@@ -130,10 +130,17 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       try {
-        const [metricsRes, objetivosRes] = await Promise.all([
+        const [metricsRes, objetivosRes, periodsRes] = await Promise.all([
           fetch("/api/metrics"),
           fetch("/api/objetivos"),
+          fetch("/api/available-periods"),
         ])
+
+        const periodsJson = await periodsRes.json()
+        const latestMetrics = periodsJson?.metrics?.latest
+        if (latestMetrics && year === 0) {
+          setYear(latestMetrics.year)
+        }
 
         const metricsJson = await metricsRes.json()
         const objetivosJson = await objetivosRes.json()
