@@ -468,7 +468,7 @@ export default function HomePage() {
             />
 
             <ProgressCard
-              title="% devueltos máximo"
+              title="% PTE P.Adq máximo"
               actual={devoluciones}
               objetivo={toNumber(objRapel.devolucionesMax)}
               mode="max"

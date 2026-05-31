@@ -200,7 +200,7 @@ export default function SeguimientoObjetivosPage() {
         isPercent: true,
       },
       {
-        label: "% devueltos máximo",
+        label: "% PTE P.Adq máximo",
         meta: devolucionesMeta,
         real: devolucionesReal,
         cumplimiento: getCumplimiento(devolucionesReal, devolucionesMeta, true),
