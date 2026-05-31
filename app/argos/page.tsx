@@ -613,10 +613,9 @@ export default function ArgosPage() {
 
       {/* ── LOB tab bar ──────────────────────────────────────────────────── */}
       <div style={{
-        borderBottom: '1px solid #e2e8f0',
         display: 'flex',
-        background: '#ffffff',
-        gap: 0,
+        gap: '8px',
+        flexWrap: 'wrap',
       }}>
         {LOB_TABS.map(t => {
           const active = lob === t.key
@@ -625,20 +624,18 @@ export default function ArgosPage() {
               key={t.key}
               onClick={() => setLob(t.key)}
               style={{
-                padding: '10px 24px',
+                padding: '7px 18px',
                 fontSize: '13px',
-                fontWeight: active ? 600 : 400,
-                color: active ? '#003A8F' : '#64748b',
-                borderBottom: active ? '2px solid #003A8F' : '2px solid transparent',
-                background: 'none',
-                border: 'none',
-                borderBottomWidth: '2px',
-                borderBottomStyle: 'solid',
-                borderBottomColor: active ? '#003A8F' : 'transparent',
+                fontWeight: active ? 600 : 500,
+                color: active ? '#ffffff' : '#475569',
+                background: active ? '#003A8F' : '#ffffff',
+                border: active ? '1px solid #003A8F' : '1px solid #e2e8f0',
+                borderRadius: '9999px',
                 cursor: 'pointer',
-                transition: 'color 0.15s, border-color 0.15s',
+                transition: 'all 0.15s',
                 outline: 'none',
                 whiteSpace: 'nowrap',
+                boxShadow: active ? '0 1px 4px rgba(0,58,143,0.2)' : '0 1px 2px rgba(0,0,0,0.04)',
               }}
               onMouseEnter={e => {
                 if (!active) (e.currentTarget as HTMLButtonElement).style.color = '#334155'
