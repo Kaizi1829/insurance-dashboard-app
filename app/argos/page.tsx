@@ -127,17 +127,17 @@ function fmtInt(v: number | null): string {
 
 function fmtEuro(v: number | null): string {
   if (v == null) return '—'
-  return v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
 function fmtPct(v: number | null): string {
   if (v == null) return '—'
-  return (v * 100).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+  return (v * 100).toFixed(2) + '%'
 }
 
 function fmtPct1(v: number | null): string {
   if (v == null) return '—'
-  return (v * 100).toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
+  return (v * 100).toFixed(1) + '%'
 }
 
 function fmtCell(v: any, type: string): string {
@@ -153,22 +153,57 @@ function fmtCell(v: any, type: string): string {
 
 // ─── Badge component ──────────────────────────────────────────────────────────
 function Badge({ v }: { v: any }) {
-  if (v == null || v === '') return <span className="text-gray-400">—</span>
+  if (v == null || v === '') {
+    return <span style={{ color: '#94a3b8' }}>—</span>
+  }
   const num = Number(v)
-  const cls = num >= 0
-    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-    : 'bg-red-50 text-red-700 border border-red-200'
   const sign = num > 0 ? '+' : ''
-  return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${cls}`}>
-      {sign}{(num * 100).toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-    </span>
-  )
+  const display = sign + (num * 100).toFixed(2) + '%'
+
+  let style: React.CSSProperties
+  if (num > 0) {
+    style = {
+      display: 'inline-block',
+      padding: '1px 6px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      fontWeight: 500,
+      whiteSpace: 'nowrap',
+      background: '#ecfdf5',
+      color: '#065f46',
+      border: '1px solid #a7f3d0',
+    }
+  } else if (num < 0) {
+    style = {
+      display: 'inline-block',
+      padding: '1px 6px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      fontWeight: 500,
+      whiteSpace: 'nowrap',
+      background: '#fef2f2',
+      color: '#991b1b',
+      border: '1px solid #fecaca',
+    }
+  } else {
+    style = {
+      display: 'inline-block',
+      padding: '1px 6px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      fontWeight: 500,
+      whiteSpace: 'nowrap',
+      background: '#f8fafc',
+      color: '#64748b',
+      border: '1px solid #e2e8f0',
+    }
+  }
+
+  return <span style={style}>{display}</span>
 }
 
 // ─── Row helpers ──────────────────────────────────────────────────────────────
 function isTotal(r: Row): boolean {
-  // A row is a total/subtotal if ramo is null/empty/Total or lob === 'Total'
   return (
     r.lob === 'Total' ||
     r.ramo == null || r.ramo === '' || r.ramo === 'Total'
@@ -176,7 +211,6 @@ function isTotal(r: Row): boolean {
 }
 
 function isSubtotal(r: Row): boolean {
-  // LOB-level totals: lob is a valid section but ramo is empty/null
   return r.lob !== 'Total' && (r.ramo == null || r.ramo === '' || r.ramo === 'Total')
 }
 
@@ -190,7 +224,6 @@ function sortNoVida(rows: Row[]): Row[] {
     const lobA = lobPriority(a.lob)
     const lobB = lobPriority(b.lob)
     if (lobA !== lobB) return lobA - lobB
-    // within same LOB: subtotals/totals last
     const aTotal = isSubtotal(a) || a.lob === 'Total'
     const bTotal = isSubtotal(b) || b.lob === 'Total'
     if (aTotal !== bTotal) return aTotal ? 1 : -1
@@ -213,15 +246,25 @@ function renderCell(
     return <Badge v={v} />
   }
   const text = fmtCell(v, col.type)
+  const isNull = (v == null || v === '')
   const isNumeric = col.type !== 'text'
-  const colorClass =
-    col.key === 'net_inflow' && v != null
-      ? Number(v) >= 0 ? 'text-emerald-700' : 'text-red-700'
-      : col.key === 'cash_flow' && v != null
-      ? Number(v) >= 0 ? 'text-emerald-700' : 'text-red-700'
-      : ''
+
+  let color: string | undefined
+  if (isNull) {
+    color = '#cbd5e1'
+  } else if (col.key === 'net_inflow') {
+    color = Number(v) >= 0 ? '#065f46' : '#991b1b'
+  } else if (col.key === 'cash_flow') {
+    color = Number(v) >= 0 ? '#065f46' : '#991b1b'
+  }
+
   return (
-    <span className={`${isNumeric ? 'tabular-nums' : ''} ${colorClass}`}>
+    <span
+      style={{
+        fontVariantNumeric: isNumeric ? 'tabular-nums' : undefined,
+        color: color,
+      }}
+    >
       {text}
     </span>
   )
@@ -263,7 +306,6 @@ function aggregateByRamo(rows: Row[], lob: string): Row[] {
         const hasAny = group.some(r => r[key] != null)
         agg[key] = hasAny ? group.reduce((s, r) => s + (r[key] != null ? Number(r[key]) : 0), 0) : null
       }
-      // pct/ratio cols can't be summed — clear them
       for (const k of Object.keys(agg)) {
         if (!SUM_COLS.includes(k) && !['lob','ramo','subramo','year','month','medor_code','medofis_code'].includes(k)) {
           agg[k] = null
@@ -276,6 +318,182 @@ function aggregateByRamo(rows: Row[], lob: string): Row[] {
   result.sort((a, b) => (a.ramo || '').localeCompare(b.ramo || '', 'es'))
   if (totalRow) result.push(totalRow)
   return result
+}
+
+// ─── Loading skeleton ────────────────────────────────────────────────────────
+function LoadingState() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: '16px' }}>
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        <circle cx="16" cy="16" r="13" stroke="#e2e8f0" strokeWidth="3" />
+        <path d="M16 3 a13 13 0 0 1 13 13" stroke="#003A8F" strokeWidth="3" strokeLinecap="round" />
+      </svg>
+      <span style={{ color: '#94a3b8', fontSize: '13px' }}>Cargando datos...</span>
+    </div>
+  )
+}
+
+// ─── Empty state ─────────────────────────────────────────────────────────────
+function EmptyState({ message }: { message: string }) {
+  return (
+    <tr>
+      <td colSpan={999}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: '12px' }}>
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <rect width="40" height="40" rx="8" fill="#f8fafc" />
+            <path d="M12 20h16M20 12v16" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <span style={{ color: '#94a3b8', fontSize: '13px' }}>{message}</span>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// ─── Reusable data table ──────────────────────────────────────────────────────
+interface DataTableProps {
+  cols: typeof NV_COLS
+  rows: Row[]
+  stickyCount: number
+  stickyColWidths: number[]   // px width per sticky column
+  isTotalRow: (row: Row) => boolean
+  emptyMessage: string
+}
+
+function DataTable({ cols, rows, stickyCount, stickyColWidths, isTotalRow, emptyMessage }: DataTableProps) {
+  // Compute left offset for each sticky column
+  const stickyLeft: number[] = []
+  let acc = 0
+  for (let i = 0; i < stickyCount; i++) {
+    stickyLeft.push(acc)
+    acc += stickyColWidths[i] ?? 96
+  }
+
+  // Colors
+  const HEADER_BG = '#003A8F'
+  const HEADER_TEXT = '#ffffff'
+  const HEADER_BORDER = 'rgba(255,255,255,0.15)'
+  const ROW_BG_REGULAR = '#ffffff'
+  const ROW_BG_TOTAL = '#f1f5f9'
+  const ROW_HOVER_REGULAR = '#eff6ff'
+  const ROW_HOVER_TOTAL = '#e2e8f0'
+  const ROW_BORDER = '#e2e8f0'
+  const STICKY_SEPARATOR = '2px solid #cbd5e1'
+
+  return (
+    // CRITICAL: border-separate so sticky works in Chrome; border-spacing:0 so no gaps
+    <table
+      style={{
+        borderCollapse: 'separate',
+        borderSpacing: 0,
+        minWidth: 'max-content',
+        width: '100%',
+        fontSize: '12px',
+        tableLayout: 'auto',
+      }}
+    >
+      <thead>
+        <tr>
+          {cols.map((col, i) => {
+            const isSticky = i < stickyCount
+            const isLastSticky = i === stickyCount - 1
+            const isNumeric = col.type !== 'text'
+            return (
+              <th
+                key={col.key}
+                style={{
+                  // sticky header th = z-50 (highest), normal header th = z-40
+                  position: isSticky ? 'sticky' : 'sticky',
+                  top: 0,
+                  left: isSticky ? stickyLeft[i] : undefined,
+                  zIndex: isSticky ? 50 : 40,
+                  backgroundColor: HEADER_BG,
+                  color: HEADER_TEXT,
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  whiteSpace: 'nowrap',
+                  padding: '10px 12px',
+                  textAlign: isNumeric ? 'right' : 'left',
+                  borderRight: isLastSticky ? STICKY_SEPARATOR : `1px solid ${HEADER_BORDER}`,
+                  borderBottom: `2px solid rgba(255,255,255,0.2)`,
+                  // Prevent bleed-through: explicit bg on the element
+                  boxShadow: isLastSticky ? '4px 0 8px rgba(0,0,0,0.08)' : undefined,
+                }}
+              >
+                {col.label}
+              </th>
+            )
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? (
+          <EmptyState message={emptyMessage} />
+        ) : (
+          rows.map((row, idx) => {
+            const total = isTotalRow(row)
+            const baseBg = total ? ROW_BG_TOTAL : ROW_BG_REGULAR
+
+            return (
+              <tr
+                key={idx}
+                onMouseEnter={e => {
+                  const target = e.currentTarget
+                  const hoverBg = total ? ROW_HOVER_TOTAL : ROW_HOVER_REGULAR
+                  Array.from(target.cells).forEach((cell, ci) => {
+                    (cell as HTMLTableCellElement).style.backgroundColor = hoverBg
+                  })
+                }}
+                onMouseLeave={e => {
+                  const target = e.currentTarget
+                  Array.from(target.cells).forEach((cell, ci) => {
+                    const isSticky = ci < stickyCount
+                    ;(cell as HTMLTableCellElement).style.backgroundColor = baseBg
+                  })
+                }}
+              >
+                {cols.map((col, i) => {
+                  const isSticky = i < stickyCount
+                  const isLastSticky = i === stickyCount - 1
+                  const isNumeric = col.type !== 'text'
+
+                  return (
+                    <td
+                      key={col.key}
+                      style={{
+                        // CRITICAL: always set explicit backgroundColor — never inherit from <tr>
+                        backgroundColor: baseBg,
+                        // sticky data td = z-20, normal data td = z-0
+                        position: isSticky ? 'sticky' : undefined,
+                        left: isSticky ? stickyLeft[i] : undefined,
+                        zIndex: isSticky ? 20 : 0,
+                        padding: '7px 12px',
+                        whiteSpace: 'nowrap',
+                        textAlign: isNumeric ? 'right' : 'left',
+                        color: total ? '#0f172a' : '#334155',
+                        fontWeight: total ? 600 : 400,
+                        height: '36px',
+                        // Row bottom border
+                        borderBottom: `1px solid ${ROW_BORDER}`,
+                        // Column separator for sticky last col
+                        borderRight: isLastSticky ? STICKY_SEPARATOR : '1px solid #f1f5f9',
+                        boxShadow: isLastSticky ? '4px 0 8px rgba(0,0,0,0.05)' : undefined,
+                      }}
+                    >
+                      {renderCell(col, row[col.key], total)}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })
+        )}
+      </tbody>
+    </table>
+  )
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -318,223 +536,190 @@ export default function ArgosPage() {
     return grandTotal ? [...lobTotals, grandTotal] : lobTotals
   })()
 
-  // NV_COLS without Subramo for the aggregated view (col index 2)
+  // NV_COLS without Subramo for the aggregated view
   const NV_COLS_AGG = NV_COLS.filter(c => c.key !== 'subramo')
 
-  // Sticky column count (LoB, Ramo — no Subramo in aggregated view)
-  const STICKY = 2
+  // Sticky column widths (px) — must match actual rendered widths
+  const NV_STICKY_WIDTHS = [80, 120]  // LoB, Ramo
+  const V_STICKY_WIDTHS = [100, 100]  // Negocio, LoB
 
-  const stickyTh = (i: number) =>
-    i < STICKY
-      ? `sticky left-0 z-20 bg-[#003A8F] ${i === 0 ? 'left-0' : i === 1 ? 'left-[96px]' : 'left-[192px]'}`
-      : ''
+  // isTotalRow for No Vida
+  const nvIsTotalRow = (row: Row): boolean => {
+    const isGrandTotal = row.lob === 'Total'
+    const isRegularTotal = lob !== 'TOTAL_IARD' && isTotal(row)
+    return isGrandTotal || isRegularTotal
+  }
 
-  // We'll use inline style for proper sticky offsets at runtime
-  const stickyOffsets = [0, 96, 192]
+  // isTotalRow for Vida
+  const vIsTotalRow = (row: Row): boolean => {
+    return row.lob === 'Total' || row.negocio === 'Total'
+  }
+
+  const selectStyle: React.CSSProperties = {
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '7px 12px',
+    fontSize: '13px',
+    background: '#ffffff',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    color: '#334155',
+    outline: 'none',
+    cursor: 'pointer',
+    minWidth: '120px',
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '0' }}>
+
+      {/* ── Top controls ─────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">ARGOS</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {MESES[month]} {year} · Datos reales AXA
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: 0, lineHeight: '1.2' }}>
+            ARGOS
+          </h1>
+          <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px', margin: '4px 0 0' }}>
+            {MESES[month]} {year} &middot; Datos reales AXA
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
           {/* Año */}
-          <select
-            value={year}
-            onChange={e => setYear(Number(e.target.value))}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Año</label>
+            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selectStyle}>
+              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
           {/* Mes */}
-          <select
-            value={month}
-            onChange={e => setMonth(Number(e.target.value))}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {MONTHS.map(m => <option key={m} value={m}>{MESES[m]}</option>)}
-          </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mes</label>
+            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selectStyle, minWidth: '130px' }}>
+              {MONTHS.map(m => <option key={m} value={m}>{MESES[m]}</option>)}
+            </select>
+          </div>
+
           {/* MEDOR / MEDOFIS */}
-          <select
-            value={medofis}
-            onChange={e => setMedofis(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {ALL_MEDOFIS.map(m => (
-              <option key={m} value={m}>{m === 'MEDOR' ? 'MEDOR (total)' : `MEDOFIS ${m}`}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mediador</label>
+            <select value={medofis} onChange={e => setMedofis(e.target.value)} style={{ ...selectStyle, minWidth: '150px' }}>
+              {ALL_MEDOFIS.map(m => (
+                <option key={m} value={m}>{m === 'MEDOR' ? 'MEDOR (total)' : `MEDOFIS ${m}`}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* LOB tab switcher */}
-      <div className="border-b border-slate-200 flex">
-        {LOB_TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setLob(t.key)}
-            className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              lob === t.key
-                ? 'border-[#003A8F] text-[#003A8F]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* ── LOB tab bar ──────────────────────────────────────────────────── */}
+      <div style={{
+        borderBottom: '1px solid #e2e8f0',
+        display: 'flex',
+        background: '#ffffff',
+        gap: 0,
+      }}>
+        {LOB_TABS.map(t => {
+          const active = lob === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setLob(t.key)}
+              style={{
+                padding: '10px 24px',
+                fontSize: '13px',
+                fontWeight: active ? 600 : 400,
+                color: active ? '#003A8F' : '#64748b',
+                borderBottom: active ? '2px solid #003A8F' : '2px solid transparent',
+                background: 'none',
+                border: 'none',
+                borderBottomWidth: '2px',
+                borderBottomStyle: 'solid',
+                borderBottomColor: active ? '#003A8F' : 'transparent',
+                cursor: 'pointer',
+                transition: 'color 0.15s, border-color 0.15s',
+                outline: 'none',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => {
+                if (!active) (e.currentTarget as HTMLButtonElement).style.color = '#334155'
+              }}
+              onMouseLeave={e => {
+                if (!active) (e.currentTarget as HTMLButtonElement).style.color = '#64748b'
+              }}
+            >
+              {t.label}
+            </button>
+          )
+        })}
       </div>
 
+      {/* ── Loading ───────────────────────────────────────────────────────── */}
       {loading && (
-        <div className="py-20 text-center text-slate-400 text-sm">Cargando datos...</div>
+        <div style={{
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          background: '#ffffff',
+          overflow: 'hidden',
+        }}>
+          <LoadingState />
+        </div>
       )}
 
-      {/* ── NO VIDA ─────────────────────────────────────────────────────── */}
-      {!loading && lob !== 'VIDA' && (() => {
-        const rows = lob === 'TOTAL_IARD' ? totalIardRows : displayNvRows
-        return (
-        <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
-            <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
-              <thead>
-                <tr className="bg-[#003A8F] text-white">
-                  {NV_COLS_AGG.map((col, i) => {
-                    const isSticky = i < STICKY
-                    const isNumeric = col.type !== 'text'
-                    return (
-                      <th
-                        key={col.key}
-                        className={`py-2 px-3 text-xs font-semibold whitespace-nowrap border-r border-blue-700 ${
-                          isNumeric ? 'text-right' : 'text-left'
-                        } ${isSticky ? 'sticky z-30 bg-[#003A8F]' : ''}`}
-                        style={isSticky ? { left: i === 0 ? 0 : 96 } : undefined}
-                      >
-                        {col.label}
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={NV_COLS_AGG.length} className="text-center py-12 text-slate-400">
-                      Sin datos
-                    </td>
-                  </tr>
-                )}
-                {rows.map((row, idx) => {
-                  // Único total en gris: el gran total (lob='Total')
-                  // En Total IARD, los totales de LOB (PARTICULARES/Total, etc.) van en blanco
-                  const isGrandTotal = row.lob === 'Total'
-                  const isRegularTotal = lob !== 'TOTAL_IARD' && isTotal(row)
-                  const showAsTotal = isGrandTotal || isRegularTotal
-                  const rowBg = showAsTotal ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white hover:bg-slate-50'
-                  const fontCls = showAsTotal ? 'font-bold' : ''
-                  return (
-                    <tr key={idx} className={`border-b border-slate-100 ${rowBg} ${fontCls}`}>
-                      {NV_COLS_AGG.map((col, i) => {
-                        const isSticky = i < STICKY
-                        const isNumeric = col.type !== 'text'
-                        const stickyBg = showAsTotal ? 'bg-slate-100' : 'bg-white'
-
-                        return (
-                          <td
-                            key={col.key}
-                            className={`py-1.5 px-3 whitespace-nowrap border-r border-slate-100 ${
-                              isNumeric ? 'text-right' : 'text-left'
-                            } ${isSticky ? `sticky z-10 ${stickyBg}` : ''}`}
-                            style={isSticky ? { left: i === 0 ? 0 : 96 } : undefined}
-                          >
-                            {renderCell(col, row[col.key], showAsTotal)}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      {/* ── NO VIDA table ─────────────────────────────────────────────────── */}
+      {!loading && lob !== 'VIDA' && (
+        <div style={{
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+          background: '#ffffff',
+        }}>
+          {/* CRITICAL: scroll container is the direct parent of the table */}
+          <div style={{
+            overflowX: 'auto',
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 280px)',
+          }}>
+            <DataTable
+              cols={NV_COLS_AGG}
+              rows={lob === 'TOTAL_IARD' ? totalIardRows : displayNvRows}
+              stickyCount={2}
+              stickyColWidths={NV_STICKY_WIDTHS}
+              isTotalRow={nvIsTotalRow}
+              emptyMessage="Sin datos para el período seleccionado"
+            />
           </div>
         </div>
-        )
-      })()}
+      )}
 
-      {/* ── VIDA ────────────────────────────────────────────────────────── */}
+      {/* ── VIDA table ────────────────────────────────────────────────────── */}
       {!loading && lob === 'VIDA' && (
-        <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
-            <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
-              <thead>
-                <tr className="bg-[#003A8F] text-white">
-                  {V_COLS.map((col, i) => {
-                    const isSticky = i < 2
-                    const isNumeric = col.type !== 'text'
-                    const vidaStickyOffsets = [0, 96]
-                    return (
-                      <th
-                        key={col.key}
-                        className={`py-2 px-3 text-xs font-semibold whitespace-nowrap border-r border-blue-700 ${
-                          isNumeric ? 'text-right' : 'text-left'
-                        } ${isSticky ? 'sticky z-30 bg-[#003A8F]' : ''}`}
-                        style={isSticky ? { left: vidaStickyOffsets[i] } : undefined}
-                      >
-                        {col.label}
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {vData.length === 0 && (
-                  <tr>
-                    <td colSpan={V_COLS.length} className="text-center py-12 text-slate-400">
-                      Sin datos de Vida
-                    </td>
-                  </tr>
-                )}
-                {vData.map((row, idx) => {
-                  const totalRow = row.lob === 'Total' || row.negocio === 'Total'
-                  const rowBg = totalRow
-                    ? 'bg-slate-100 hover:bg-slate-200'
-                    : 'bg-white hover:bg-slate-50'
-                  const fontCls = totalRow ? 'font-bold' : ''
-                  const vidaStickyOffsets = [0, 96]
-
-                  return (
-                    <tr
-                      key={idx}
-                      className={`border-b border-slate-100 ${rowBg} ${fontCls}`}
-                    >
-                      {V_COLS.map((col, i) => {
-                        const isSticky = i < 2
-                        const isNumeric = col.type !== 'text'
-                        const stickyBg = totalRow ? 'bg-slate-100' : 'bg-white'
-
-                        return (
-                          <td
-                            key={col.key}
-                            className={`py-1.5 px-3 whitespace-nowrap border-r border-slate-100 ${
-                              isNumeric ? 'text-right' : 'text-left'
-                            } ${isSticky ? `sticky z-10 ${stickyBg}` : ''}`}
-                            style={isSticky ? { left: vidaStickyOffsets[i] } : undefined}
-                          >
-                            {renderCell(col, row[col.key], totalRow)}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        <div style={{
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+          background: '#ffffff',
+        }}>
+          {/* CRITICAL: scroll container is the direct parent of the table */}
+          <div style={{
+            overflowX: 'auto',
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 280px)',
+          }}>
+            <DataTable
+              cols={V_COLS}
+              rows={vData}
+              stickyCount={2}
+              stickyColWidths={V_STICKY_WIDTHS}
+              isTotalRow={vIsTotalRow}
+              emptyMessage="Sin datos de Vida para el período seleccionado"
+            />
           </div>
         </div>
       )}
+
     </div>
   )
 }
