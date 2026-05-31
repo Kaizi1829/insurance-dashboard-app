@@ -141,6 +141,9 @@ function fmtPct1(v: number | null): string {
 
 function fmtCell(v: any, type: string): string {
   if (v == null || v === '') return '—'
+  const n = Number(v)
+  // En tablas financieras, 0 en importes/enteros significa "sin actividad" → mostrar —
+  if ((type === 'euro' || type === 'int') && n === 0) return '—'
   switch (type) {
     case 'int':   return fmtInt(v)
     case 'euro':  return fmtEuro(v)
