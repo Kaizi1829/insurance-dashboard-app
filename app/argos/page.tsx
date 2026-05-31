@@ -498,9 +498,7 @@ export default function ArgosPage() {
                   </tr>
                 )}
                 {vData.map((row, idx) => {
-                  const totalRow =
-                    (row.negocio === 'Total' || row.negocio == null || row.negocio === '') &&
-                    (row.lob === 'Total' || row.lob == null || row.lob === '')
+                  const totalRow = row.lob === 'Total' || row.negocio === 'Total'
                   const rowBg = totalRow
                     ? 'bg-slate-100 hover:bg-slate-200'
                     : 'bg-white hover:bg-slate-50'
