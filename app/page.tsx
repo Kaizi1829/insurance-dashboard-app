@@ -8,6 +8,7 @@ import {
   Percent,
   ArrowUpRight,
   Target,
+  AlertTriangle,
 } from "lucide-react"
 
 import {
@@ -231,154 +232,41 @@ export default function HomePage() {
   }, [metrics])
 
   const productionGroups = useMemo(() => {
-    if (!data) {
-      return {
-        particulares: [],
-        empresa: [],
-        vidaAhorro: [],
-        psc: [],
-      }
-    }
+    if (!data) return { particulares: [], empresa: [], salud: [], vidaAhorro: [], psc: [] }
 
-    const currentMonth = Number(data.month)
-
-    const previousYearMetrics = metrics
-      .filter(
-        (m: any) =>
-          Number(m.year) === year - 1 &&
-          getMediatorCode(m) === "GLOBAL" &&
-          Number(m.month) <= currentMonth
-      )
-      .sort((a: any, b: any) => Number(a.month) - Number(b.month))
-
-    const previousYearSnapshot =
-      previousYearMetrics.length > 0
-        ? previousYearMetrics[previousYearMetrics.length - 1]
-        : null
+    // anterior viene de produccion.anterior (GWPNPA del Argos)
+    const ant = (path: string) => getValueByPath(data, `produccion.anterior.${path}`)
+    const act = (path: string) => getValueByPath(data, `produccion.${path}`)
 
     return {
       particulares: [
-        {
-          name: "Auto",
-          actual: getValueByPath(data, "produccion.particulares.auto"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.auto"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Hogar",
-          actual: getValueByPath(data, "produccion.particulares.hogar"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.hogar"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Comunidades",
-          actual: getValueByPath(data, "produccion.particulares.comunidades"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.comunidades"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Decesos",
-          actual: getValueByPath(data, "produccion.particulares.decesos"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.decesos"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "RC particulares",
-          actual: getValueByPath(data, "produccion.particulares.rc"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.rc"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Salud",
-          actual: getValueByPath(data, "produccion.particulares.salud"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.salud"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Total particulares",
-          actual: getValueByPath(data, "produccion.particulares.total"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.total"),
-          color: COLORS[0],
-          isHighlighted: true,
-        },
+        { name: "Auto",             actual: act("particulares.auto"),        anterior: ant("particulares.auto"),        color: COLORS[0], isHighlighted: false },
+        { name: "Hogar",            actual: act("particulares.hogar"),       anterior: ant("particulares.hogar"),       color: COLORS[0], isHighlighted: false },
+        { name: "Decesos",          actual: act("particulares.decesos"),     anterior: ant("particulares.decesos"),     color: COLORS[0], isHighlighted: false },
+        { name: "RC",               actual: act("particulares.rc"),          anterior: ant("particulares.rc"),          color: COLORS[0], isHighlighted: false },
+        { name: "Comunidades",      actual: act("particulares.comunidades"), anterior: ant("particulares.comunidades"), color: COLORS[0], isHighlighted: false },
+        { name: "Total Particulares", actual: act("particulares.total"),     anterior: ant("particulares.total"),       color: COLORS[0], isHighlighted: true  },
       ],
       empresa: [
-        {
-          name: "RC empresa",
-          actual: getValueByPath(data, "produccion.empresa.rc"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.rc"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Flotas",
-          actual: getValueByPath(data, "produccion.empresa.flotas"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.flotas"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Comercio",
-          actual: getValueByPath(data, "produccion.empresa.comercio"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.comercio"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Oficina",
-          actual: getValueByPath(data, "produccion.empresa.oficina"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.oficina"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Industria",
-          actual: getValueByPath(data, "produccion.empresa.industria"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.industria"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Total empresa",
-          actual: getValueByPath(data, "produccion.empresa.total"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.total"),
-          color: COLORS[1],
-          isHighlighted: true,
-        },
+        { name: "Flotas",           actual: act("empresa.flotas"),    anterior: ant("empresa.flotas"),    color: COLORS[1], isHighlighted: false },
+        { name: "RC Empresa",       actual: act("empresa.rc"),        anterior: ant("empresa.rc"),        color: COLORS[1], isHighlighted: false },
+        { name: "Comercio",         actual: act("empresa.comercio"),  anterior: ant("empresa.comercio"),  color: COLORS[1], isHighlighted: false },
+        { name: "Oficina",          actual: act("empresa.oficina"),   anterior: ant("empresa.oficina"),   color: COLORS[1], isHighlighted: false },
+        { name: "Industria",        actual: act("empresa.industria"), anterior: ant("empresa.industria"), color: COLORS[1], isHighlighted: false },
+        { name: "Total Empresa",    actual: act("empresa.total"),     anterior: ant("empresa.total"),     color: COLORS[1], isHighlighted: true  },
+      ],
+      salud: [
+        { name: "Salud",            actual: act("salud.total"),       anterior: ant("salud.total"),       color: COLORS[4], isHighlighted: true  },
       ],
       vidaAhorro: [
-        {
-          name: "Vida",
-          actual: getValueByPath(data, "produccion.vida.individual"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.vida.individual"),
-          color: COLORS[2],
-          isHighlighted: true,
-        },
-        {
-          name: "Ahorro",
-          actual: getValueByPath(data, "produccion.vida.ahorro"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.vida.ahorro"),
-          color: COLORS[3],
-          isHighlighted: true,
-        },
+        { name: "Vida Individual",  actual: act("vida.individual"),   anterior: ant("vida.individual"),   color: COLORS[2], isHighlighted: false },
+        { name: "Ahorro",           actual: act("vida.ahorro"),       anterior: ant("vida.ahorro"),       color: COLORS[3], isHighlighted: true  },
       ],
       psc: [
-        {
-          name: "PSC",
-          actual: getValueByPath(data, "produccion.psc.total"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.psc.total"),
-          color: COLORS[4],
-          isHighlighted: true,
-        },
+        { name: "PSC",              actual: act("psc.total"),         anterior: ant("psc.total"),         color: COLORS[4], isHighlighted: true  },
       ],
     }
-  }, [data, metrics, year])
+  }, [data])
 
   if (!data) {
     return (
@@ -417,6 +305,7 @@ export default function HomePage() {
   const crecimiento = toNumber(data?.medofis?.crecimientoPct)
   const cor = toNumber(data?.medofis?.cor)
   const devoluciones = toNumber(data?.medofis?.devolucionesPct)
+  const siniestralidad = toNumber(data?.medofis?.siniestralidadSinIbnrPct)
 
   const prevGwp = previousData ? toNumber(previousData?.medofis?.gwp) : null
   const prevRenovacion = previousData
@@ -434,26 +323,12 @@ export default function HomePage() {
   const prodVida = toNumber(data?.produccion?.vida?.individual)
 
   const carteraData = [
-    {
-      name: "Particulares",
-      value: toNumber(data?.cartera?.particulares?.total),
-    },
-    {
-      name: "Empresa",
-      value: toNumber(data?.cartera?.empresa?.total),
-    },
-    {
-      name: "Vida",
-      value: toNumber(data?.cartera?.vida?.individual),
-    },
-    {
-      name: "Ahorro",
-      value: toNumber(data?.cartera?.vida?.ahorro),
-    },
-    {
-      name: "PSC",
-      value: toNumber(data?.cartera?.psc?.total),
-    },
+    { name: "Particulares", value: toNumber(data?.cartera?.particulares?.total) },
+    { name: "Empresa",      value: toNumber(data?.cartera?.empresa?.total) },
+    { name: "Salud",        value: toNumber(data?.cartera?.salud?.total) },
+    { name: "Vida",         value: toNumber(data?.cartera?.vida?.individual) },
+    { name: "Ahorro",       value: toNumber(data?.cartera?.vida?.ahorro) },
+    { name: "PSC",          value: toNumber(data?.cartera?.psc?.total) },
   ].filter((item) => item.value > 0)
 
   const objRapel = objetivos?.rapelAnual || {
@@ -486,7 +361,7 @@ export default function HomePage() {
         </select>
       </div>
 
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-6">
         <Kpi
           title="GWP"
           value={formatEuros(gwp)}
@@ -547,6 +422,15 @@ export default function HomePage() {
           subvalue={prevCor !== null ? `Anterior: ${formatPercent(prevCor)}` : "Anterior: -"}
           icon={ArrowUpRight}
           type="cor"
+        />
+        <Kpi
+          title="Siniest. sin IBNR"
+          value={formatPercent(siniestralidad)}
+          raw={siniestralidad}
+          previousRaw={null}
+          subvalue="Total IARD"
+          icon={AlertTriangle}
+          type="siniestralidad"
         />
       </section>
 
@@ -690,6 +574,7 @@ export default function HomePage() {
           <div className="mt-4 space-y-3">
             <ProductionTable title="Particulares" data={productionGroups.particulares} />
             <ProductionTable title="Empresa" data={productionGroups.empresa} />
+            <ProductionTable title="Salud" data={productionGroups.salud} />
             <ProductionTable title="Vida y Ahorro" data={productionGroups.vidaAhorro} />
             <ProductionTable title="PSC" data={productionGroups.psc} />
           </div>
@@ -714,7 +599,7 @@ function Kpi({
   raw: number
   previousRaw?: number | null
   icon: any
-  type: "money" | "renovacion" | "tnp" | "crecimiento" | "cor"
+  type: "money" | "renovacion" | "tnp" | "crecimiento" | "cor" | "siniestralidad"
 }) {
   function getColor() {
     if (type === "renovacion") {
@@ -737,6 +622,12 @@ function Kpi({
 
     if (type === "cor") {
       if (raw > 100) return "text-red-600"
+      return "text-green-600"
+    }
+
+    if (type === "siniestralidad") {
+      if (raw > 80) return "text-red-600"
+      if (raw > 60) return "text-orange-500"
       return "text-green-600"
     }
 
@@ -803,8 +694,8 @@ function ProductionTable({
 
       <div className="grid grid-cols-4 text-[11px] font-medium text-slate-400 mb-1 px-2">
         <span>Ramo</span>
-        <span className="text-right">2025</span>
-        <span className="text-right">2026</span>
+        <span className="text-right">GWPNPA (ant.)</span>
+        <span className="text-right">GWPNP (act.)</span>
         <span className="text-right">Var.</span>
       </div>
 
