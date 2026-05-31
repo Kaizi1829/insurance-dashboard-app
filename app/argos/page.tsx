@@ -37,8 +37,10 @@ export default function ArgosPage() {
   useEffect(() => {
     setLoading(true)
     const base = `/api/argos?year=${year}&month=${month}&medor=742776`
+    // 'MEDOR' es la vista consolidada → medofis_code='TOTAL' en BD
+    const medofisParam = medofis === 'MEDOR' ? 'TOTAL' : medofis
     Promise.all([
-      fetch(`${base}&tipo=novida&medofis=${medofis}`).then(r => r.json()),
+      fetch(`${base}&tipo=novida&medofis=${medofisParam}`).then(r => r.json()),
       fetch(`${base}&tipo=vida`).then(r => r.json()),
     ]).then(([nv, v]) => {
       setData(nv.data || [])
@@ -51,10 +53,10 @@ export default function ArgosPage() {
   const allLobs = ['Total', 'PARTICULARES', 'EMPRESAS', 'SALUD']
 
   const noVidaRows = data.filter(r =>
-    lob === 'Total' ? (r.lob === 'Total' && r.subramo === '') : r.lob === lob
+    lob === 'Total' ? (r.lob === 'Total' && (r.subramo == null || r.subramo === '')) : r.lob === lob
   )
 
-  const kpiRow = data.find(r => r.lob === 'Total' && r.subramo === '') || null
+  const kpiRow = data.find(r => r.lob === 'Total' && (r.subramo == null || r.subramo === '')) || null
 
   return (
     <div className="space-y-6">
