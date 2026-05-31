@@ -9,8 +9,8 @@ type Row = Record<string, any>
 const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-const YEAR = 2026
-const MONTH = 3
+const YEARS = [2024, 2025, 2026, 2027]
+const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
 
 const ALL_MEDOFIS = ['MEDOR', '742776', '742826', '742821', '755224']
 
@@ -280,6 +280,8 @@ function aggregateByRamo(rows: Row[], lob: string): Row[] {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ArgosPage() {
+  const [year, setYear] = useState(2026)
+  const [month, setMonth] = useState(3)
   const [medofis, setMedofis] = useState('MEDOR')
   const [nvData, setNvData] = useState<Row[]>([])
   const [vData, setVData] = useState<Row[]>([])
@@ -288,7 +290,7 @@ export default function ArgosPage() {
 
   useEffect(() => {
     setLoading(true)
-    const base = `/api/argos?year=${YEAR}&month=${MONTH}&medor=742776`
+    const base = `/api/argos?year=${year}&month=${month}&medor=742776`
     const medofisParam = medofis === 'MEDOR' ? 'TOTAL' : medofis
     Promise.all([
       fetch(`${base}&tipo=novida&medofis=${medofisParam}`).then(r => r.json()),
@@ -298,7 +300,7 @@ export default function ArgosPage() {
       setVData(v.data || [])
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [medofis])
+  }, [year, month, medofis])
 
   // Aggregate rows for the selected LOB tab
   const displayNvRows: Row[] = (() => {
@@ -335,20 +337,39 @@ export default function ArgosPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Panel ARGOS</h1>
+          <h1 className="text-2xl font-bold text-slate-800">ARGOS</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {MESES[MONTH]} {YEAR} · Datos reales AXA
+            {MESES[month]} {year} · Datos reales AXA
           </p>
         </div>
-        <select
-          value={medofis}
-          onChange={e => setMedofis(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {ALL_MEDOFIS.map(m => (
-            <option key={m} value={m}>{m === 'MEDOR' ? 'MEDOR (agrupado)' : m}</option>
-          ))}
-        </select>
+        <div className="flex flex-wrap gap-2">
+          {/* Año */}
+          <select
+            value={year}
+            onChange={e => setYear(Number(e.target.value))}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          {/* Mes */}
+          <select
+            value={month}
+            onChange={e => setMonth(Number(e.target.value))}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {MONTHS.map(m => <option key={m} value={m}>{MESES[m]}</option>)}
+          </select>
+          {/* MEDOR / MEDOFIS */}
+          <select
+            value={medofis}
+            onChange={e => setMedofis(e.target.value)}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {ALL_MEDOFIS.map(m => (
+              <option key={m} value={m}>{m === 'MEDOR' ? 'MEDOR (total)' : `MEDOFIS ${m}`}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* LOB tab switcher */}

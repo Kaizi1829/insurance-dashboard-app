@@ -47,18 +47,13 @@ const menuGroups: MenuGroup[] = [
     items: [
       {
         label: "ARGOS",
-        href: "/registro",
+        href: "/argos" as Route,
         icon: ClipboardList,
       },
       {
         label: "Objetivos",
         href: "/objetivos",
         icon: Target,
-      },
-      {
-        label: "ARGOS Real",
-        href: "/argos" as Route,
-        icon: LayoutDashboard,
       },
     ],
   },
