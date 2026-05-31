@@ -2,114 +2,313 @@
 
 import { useState, useEffect } from 'react'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+type Row = Record<string, any>
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-function fmt(v: number | null, dec = 0, suffix = '') {
-  if (v == null) return '—'
-  return v.toLocaleString('es-ES', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suffix
+const YEAR = 2026
+const MONTH = 3
+
+const ALL_MEDOFIS = ['MEDOR', '742776', '742826', '742821', '755224']
+
+const LOB_ORDER: Record<string, number> = {
+  PARTICULARES: 1,
+  EMPRESAS: 2,
+  SALUD: 3,
+  Total: 4,
 }
 
-function Badge({ v }: { v: number | null }) {
-  if (v == null) return <span className="text-gray-400">—</span>
-  const cls = v >= 0
+// ─── No Vida column definitions ──────────────────────────────────────────────
+const NV_COLS: { label: string; key: string; type: 'text' | 'int' | 'euro' | 'pct' | 'pct1' | 'badge' }[] = [
+  { label: 'LoB',                   key: 'lob',                      type: 'text'  },
+  { label: 'Ramo',                  key: 'ramo',                     type: 'text'  },
+  { label: 'Subramo',               key: 'subramo',                  type: 'text'  },
+  { label: '% Renov. Primas',       key: 'renov_primas_pct',         type: 'pct'   },
+  { label: '% Caída Pólizas',       key: 'caida_polizas_pct',        type: 'pct'   },
+  { label: 'TR Pólizas',            key: 'tr_polizas',               type: 'pct'   },
+  { label: 'TR Pólizas Ant',        key: 'tr_polizas_ant',           type: 'pct'   },
+  { label: '% Tasa NP',             key: 'tasa_np_pct',              type: 'pct'   },
+  { label: '% Tasa NP M.Equip.',    key: 'tasa_np_mequip_pct',       type: 'pct'   },
+  { label: '% Tasa NP M.Equip./NP', key: 'tasa_np_mequip_np_pct',   type: 'pct'   },
+  { label: 'NP',                    key: 'np',                       type: 'int'   },
+  { label: 'NP Ant',                key: 'np_ant',                   type: 'int'   },
+  { label: '% Var NP',              key: 'var_np_pct',               type: 'badge' },
+  { label: 'POL',                   key: 'pol',                      type: 'int'   },
+  { label: 'Net Inflow',            key: 'net_inflow',               type: 'int'   },
+  { label: 'GWP',                   key: 'gwp',                      type: 'euro'  },
+  { label: 'GWPA',                  key: 'gwpa',                     type: 'euro'  },
+  { label: '% GWP',                 key: 'gwp_pct',                  type: 'badge' },
+  { label: 'GWPNP',                 key: 'gwpnp',                    type: 'euro'  },
+  { label: 'GWPNPA',                key: 'gwpnpa',                   type: 'euro'  },
+  { label: '% Var GWPNP',           key: 'var_gwpnp_pct',            type: 'badge' },
+  { label: 'GWPNP Media',           key: 'gwpnp_media',              type: 'euro'  },
+  { label: '% Var GWPNP Media',     key: 'var_gwpnp_media_pct',      type: 'badge' },
+  { label: 'Primas Adq.',           key: 'primas_adq',               type: 'euro'  },
+  { label: '% Var P.Adq',           key: 'var_p_adq_pct',            type: 'badge' },
+  { label: '% PTE P.Adq',           key: 'pte_p_adq_pct',            type: 'pct'   },
+  { label: 'Siniest. sin IBNR',     key: 'siniestralidad_sin_ibnr',  type: 'pct1'  },
+  { label: 'SCCY',                  key: 'sccy',                     type: 'int'   },
+  { label: '% SCCY',                key: 'sccy_pct',                 type: 'pct'   },
+  { label: 'SCCY Ant',              key: 'sccy_ant',                 type: 'int'   },
+  { label: 'Dif SCCY',              key: 'dif_sccy',                 type: 'int'   },
+  { label: 'SCCY Leves',            key: 'sccy_leves',               type: 'int'   },
+  { label: 'SCCY Leves Ant',        key: 'sccy_leves_ant',           type: 'int'   },
+  { label: 'Dif SCCY Leves',        key: 'dif_sccy_leves',           type: 'int'   },
+  { label: 'SP NP',                 key: 'sp_np',                    type: 'euro'  },
+  { label: 'SP Ant',                key: 'sp_ant',                   type: 'euro'  },
+  { label: 'Dif SP NP',             key: 'dif_sp_np',                type: 'int'   },
+  { label: 'SCCY+C.Adq',           key: 'sccy_cadq',                type: 'int'   },
+  { label: 'SCCY+C.Adq Ant',       key: 'sccy_cadq_ant',            type: 'int'   },
+  { label: 'Dif SCCY+C.Adq',       key: 'dif_sccy_cadq',            type: 'int'   },
+  { label: 'Importe COR',           key: 'importe_cor',              type: 'euro'  },
+  { label: 'COR',                   key: 'cor',                      type: 'pct1'  },
+  { label: 'Margen YTD',            key: 'margen_ytd',               type: 'euro'  },
+]
+
+// ─── Vida column definitions ──────────────────────────────────────────────────
+const V_COLS: { label: string; key: string; type: 'text' | 'int' | 'euro' | 'pct' | 'pct1' | 'badge' }[] = [
+  { label: 'Negocio',          key: 'negocio',          type: 'text'  },
+  { label: 'LoB',              key: 'lob',              type: 'text'  },
+  { label: '% Renov Primas',   key: 'renov_primas_pct', type: 'pct'   },
+  { label: 'Tasa NP',          key: 'tasa_np',          type: 'pct'   },
+  { label: 'Tasa NP M.Equip',  key: 'tasa_np_mequip',   type: 'pct'   },
+  { label: 'Pólizas',          key: 'polizas',          type: 'int'   },
+  { label: 'Caída',            key: 'caida',            type: 'int'   },
+  { label: 'TR Pólizas',       key: 'tr_polizas',       type: 'pct'   },
+  { label: 'TR Pólizas Ant',   key: 'tr_polizas_ant',   type: 'pct'   },
+  { label: 'Pólizas NP',       key: 'polizas_np',       type: 'int'   },
+  { label: 'Pólizas NP Ant',   key: 'polizas_np_ant',   type: 'int'   },
+  { label: '% Var Pol NP',     key: 'var_polnp_pct',    type: 'badge' },
+  { label: 'Net Inflow',       key: 'net_inflow',       type: 'int'   },
+  { label: 'GWPNP',            key: 'gwpnp',            type: 'euro'  },
+  { label: 'GWPNPA',           key: 'gwpnpa',           type: 'euro'  },
+  { label: '% Var GWPNP',      key: 'var_gwpnp_pct',    type: 'badge' },
+  { label: 'CSM',              key: 'csm',              type: 'euro'  },
+  { label: 'GWP',              key: 'gwp',              type: 'euro'  },
+  { label: 'GWPA',             key: 'gwpa',             type: 'euro'  },
+  { label: '% Var GWP',        key: 'var_gwp_pct',      type: 'badge' },
+  { label: 'GWPPP',            key: 'gwppp',            type: 'euro'  },
+  { label: '% Var GWPPP',      key: 'var_gwppp_pct',    type: 'badge' },
+  { label: 'GWPPPU',           key: 'gwpppu',           type: 'euro'  },
+  { label: '% Var GWPPPU',     key: 'var_gwpppu_pct',   type: 'badge' },
+  { label: 'GWPNPPU',          key: 'gwpnppu',          type: 'euro'  },
+  { label: 'APE',              key: 'ape',              type: 'euro'  },
+  { label: '% Var APE',        key: 'var_ape_pct',      type: 'badge' },
+  { label: 'P Mat',            key: 'p_mat',            type: 'euro'  },
+  { label: 'P Mat n-1',        key: 'p_mat_n1',         type: 'euro'  },
+  { label: 'Var P Mat',        key: 'var_pmat',         type: 'euro'  },
+  { label: 'Venc',             key: 'venc',             type: 'euro'  },
+  { label: '% Var Venc',       key: 'var_venc_pct',     type: 'badge' },
+  { label: 'Resc',             key: 'resc',             type: 'euro'  },
+  { label: '% Var Rescat',     key: 'var_rescat_pct',   type: 'badge' },
+  { label: 'Siniest',          key: 'siniest',          type: 'euro'  },
+  { label: '% Var Capital',    key: 'var_capital_pct',  type: 'badge' },
+  { label: 'Rentas',           key: 'rentas',           type: 'euro'  },
+  { label: '% Var Rentas',     key: 'var_rentas_pct',   type: 'badge' },
+  { label: 'Otros',            key: 'otros',            type: 'euro'  },
+  { label: '% Var Otros',      key: 'var_otros_pct',    type: 'badge' },
+  { label: 'Prestaciones',     key: 'prestaciones',     type: 'euro'  },
+  { label: '% Var Presta',     key: 'var_presta_pct',   type: 'badge' },
+  { label: 'Cash Flow',        key: 'cash_flow',        type: 'euro'  },
+  { label: 'Var Cash Flow',    key: 'var_cash_flow',    type: 'euro'  },
+  { label: 'COR',              key: 'cor',              type: 'pct1'  },
+  { label: '% PTE',            key: 'pte_pct',          type: 'pct'   },
+  { label: 'Margen YTD',       key: 'margen_ytd',       type: 'euro'  },
+]
+
+// ─── Formatters ───────────────────────────────────────────────────────────────
+function fmtInt(v: number | null): string {
+  if (v == null) return '—'
+  return Math.round(v).toLocaleString('es-ES')
+}
+
+function fmtEuro(v: number | null): string {
+  if (v == null) return '—'
+  return v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtPct(v: number | null): string {
+  if (v == null) return '—'
+  return (v * 100).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+}
+
+function fmtPct1(v: number | null): string {
+  if (v == null) return '—'
+  return (v * 100).toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
+}
+
+function fmtCell(v: any, type: string): string {
+  if (v == null || v === '') return '—'
+  switch (type) {
+    case 'int':   return fmtInt(v)
+    case 'euro':  return fmtEuro(v)
+    case 'pct':   return fmtPct(v)
+    case 'pct1':  return fmtPct1(v)
+    default:      return String(v)
+  }
+}
+
+// ─── Badge component ──────────────────────────────────────────────────────────
+function Badge({ v }: { v: any }) {
+  if (v == null || v === '') return <span className="text-gray-400">—</span>
+  const num = Number(v)
+  const cls = num >= 0
     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
     : 'bg-red-50 text-red-700 border border-red-200'
+  const sign = num > 0 ? '+' : ''
   return (
-    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
-      {v > 0 ? '+' : ''}{(v * 100).toFixed(1)}%
+    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${cls}`}>
+      {sign}{(num * 100).toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
     </span>
   )
 }
 
-type Row = Record<string, any>
+// ─── Row helpers ──────────────────────────────────────────────────────────────
+function isTotal(r: Row): boolean {
+  // A row is a total/subtotal if ramo is null/empty/Total or lob === 'Total'
+  return (
+    r.lob === 'Total' ||
+    r.ramo == null || r.ramo === '' || r.ramo === 'Total'
+  )
+}
 
+function isSubtotal(r: Row): boolean {
+  // LOB-level totals: lob is a valid section but ramo is empty/null
+  return r.lob !== 'Total' && (r.ramo == null || r.ramo === '' || r.ramo === 'Total')
+}
+
+function lobPriority(lob: string): number {
+  return LOB_ORDER[lob] ?? 99
+}
+
+// Sort No Vida rows: by LOB priority, then ramo, then subramo; totals last within group
+function sortNoVida(rows: Row[]): Row[] {
+  return [...rows].sort((a, b) => {
+    const lobA = lobPriority(a.lob)
+    const lobB = lobPriority(b.lob)
+    if (lobA !== lobB) return lobA - lobB
+    // within same LOB: subtotals/totals last
+    const aTotal = isSubtotal(a) || a.lob === 'Total'
+    const bTotal = isSubtotal(b) || b.lob === 'Total'
+    if (aTotal !== bTotal) return aTotal ? 1 : -1
+    const ramoA = (a.ramo || '').toLowerCase()
+    const ramoB = (b.ramo || '').toLowerCase()
+    if (ramoA !== ramoB) return ramoA < ramoB ? -1 : 1
+    const subA = (a.subramo || '').toLowerCase()
+    const subB = (b.subramo || '').toLowerCase()
+    return subA < subB ? -1 : subA > subB ? 1 : 0
+  })
+}
+
+// ─── Table cell renderer ──────────────────────────────────────────────────────
+function renderCell(
+  col: { key: string; type: string },
+  v: any,
+  isTotalRow: boolean
+) {
+  if (col.type === 'badge') {
+    return <Badge v={v} />
+  }
+  const text = fmtCell(v, col.type)
+  const isNumeric = col.type !== 'text'
+  const colorClass =
+    col.key === 'net_inflow' && v != null
+      ? Number(v) >= 0 ? 'text-emerald-700' : 'text-red-700'
+      : col.key === 'cash_flow' && v != null
+      ? Number(v) >= 0 ? 'text-emerald-700' : 'text-red-700'
+      : ''
+  return (
+    <span className={`${isNumeric ? 'tabular-nums' : ''} ${colorClass}`}>
+      {text}
+    </span>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function ArgosPage() {
-  const year = 2026
-  const month = 3
   const [medofis, setMedofis] = useState('MEDOR')
-  const [lob, setLob] = useState('Total')
-  const [data, setData] = useState<Row[]>([])
-  const [vidaData, setVidaData] = useState<Row[]>([])
+  const [nvData, setNvData] = useState<Row[]>([])
+  const [vData, setVData] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<'novida' | 'vida'>('novida')
 
   useEffect(() => {
     setLoading(true)
-    const base = `/api/argos?year=${year}&month=${month}&medor=742776`
-    // 'MEDOR' es la vista consolidada → medofis_code='TOTAL' en BD
+    const base = `/api/argos?year=${YEAR}&month=${MONTH}&medor=742776`
     const medofisParam = medofis === 'MEDOR' ? 'TOTAL' : medofis
     Promise.all([
       fetch(`${base}&tipo=novida&medofis=${medofisParam}`).then(r => r.json()),
       fetch(`${base}&tipo=vida`).then(r => r.json()),
     ]).then(([nv, v]) => {
-      setData(nv.data || [])
-      setVidaData(v.data || [])
+      setNvData(nv.data || [])
+      setVData(v.data || [])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [medofis])
 
-  const allMedofis = ['MEDOR', '742776', '742826', '742821', '755224']
-  const allLobs = ['Total', 'PARTICULARES', 'EMPRESAS', 'SALUD']
+  // Build grouped No Vida rows with section headers
+  const sortedNv = sortNoVida(nvData)
 
-  const noVidaRows = data.filter(r =>
-    lob === 'Total' ? (r.lob === 'Total' && (r.subramo == null || r.subramo === '')) : r.lob === lob
-  )
+  type DisplayRow =
+    | { kind: 'section'; lob: string }
+    | { kind: 'data'; row: Row }
 
-  const kpiRow = data.find(r => r.lob === 'Total' && (r.subramo == null || r.subramo === '')) || null
+  const displayNv: DisplayRow[] = []
+  let lastLob = ''
+  for (const row of sortedNv) {
+    const lob = row.lob || 'Total'
+    if (lob !== lastLob) {
+      displayNv.push({ kind: 'section', lob })
+      lastLob = lob
+    }
+    displayNv.push({ kind: 'data', row })
+  }
+
+  // Sticky column count (LoB, Ramo, Subramo)
+  const STICKY = 3
+
+  const stickyTh = (i: number) =>
+    i < STICKY
+      ? `sticky left-0 z-20 bg-[#003A8F] ${i === 0 ? 'left-0' : i === 1 ? 'left-[96px]' : 'left-[192px]'}`
+      : ''
+
+  // We'll use inline style for proper sticky offsets at runtime
+  const stickyOffsets = [0, 96, 192]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Panel ARGOS</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{MESES[month]} {year} · Datos reales AXA</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {MESES[MONTH]} {YEAR} · Datos reales AXA
+          </p>
         </div>
         <select
           value={medofis}
           onChange={e => setMedofis(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          {allMedofis.map(m => (
+          {ALL_MEDOFIS.map(m => (
             <option key={m} value={m}>{m === 'MEDOR' ? 'MEDOR (agrupado)' : m}</option>
           ))}
         </select>
       </div>
 
-      {kpiRow && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">GWP</p>
-            <p className="text-2xl font-bold text-slate-800 mt-1">{fmt(kpiRow.gwp, 0, ' €')}</p>
-            <p className="text-xs text-slate-400 mt-0.5"><Badge v={kpiRow.gwp_pct} /></p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Pólizas</p>
-            <p className="text-2xl font-bold text-slate-800 mt-1">{fmt(kpiRow.pol)}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Net: {kpiRow.net_inflow ?? '—'}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">GWP NP</p>
-            <p className="text-2xl font-bold text-slate-800 mt-1">{fmt(kpiRow.gwpnp, 0, ' €')}</p>
-            <p className="text-xs text-slate-400 mt-0.5"><Badge v={kpiRow.var_gwpnp_pct} /></p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Siniestralidad</p>
-            <p className="text-2xl font-bold text-slate-800 mt-1">
-              {kpiRow.siniestralidad_sin_ibnr != null ? (kpiRow.siniestralidad_sin_ibnr * 100).toFixed(1) + '%' : '—'}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">sin IBNR</p>
-          </div>
-        </div>
-      )}
-
+      {/* Tab switcher */}
       <div className="border-b border-slate-200 flex">
         {(['novida', 'vida'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition ${
-              tab === t ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t
+                ? 'border-[#003A8F] text-[#003A8F]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             {t === 'novida' ? 'No Vida' : 'Vida'}
@@ -117,104 +316,166 @@ export default function ArgosPage() {
         ))}
       </div>
 
-      {loading && <div className="py-16 text-center text-slate-400">Cargando datos...</div>}
+      {loading && (
+        <div className="py-20 text-center text-slate-400 text-sm">Cargando datos...</div>
+      )}
 
+      {/* ── NO VIDA ─────────────────────────────────────────────────────── */}
       {!loading && tab === 'novida' && (
-        <div>
-          <div className="flex gap-2 mb-4 flex-wrap">
-            {allLobs.map(l => (
-              <button
-                key={l}
-                onClick={() => setLob(l)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  lob === l ? 'bg-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
-            <table className="w-full text-sm">
+        <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
+          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
+            <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">LOB / Ramo</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Subramo</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Pólizas</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Net</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">GWP €</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Var GWP</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">NP</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">GWP NP €</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Var NP</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Siniest.</th>
+                <tr className="bg-[#003A8F] text-white">
+                  {NV_COLS.map((col, i) => {
+                    const isSticky = i < STICKY
+                    const isNumeric = col.type !== 'text'
+                    return (
+                      <th
+                        key={col.key}
+                        className={`py-2 px-3 text-xs font-semibold whitespace-nowrap border-r border-blue-700 ${
+                          isNumeric ? 'text-right' : 'text-left'
+                        } ${isSticky ? 'sticky z-30 bg-[#003A8F]' : ''}`}
+                        style={isSticky ? { left: stickyOffsets[i] } : undefined}
+                      >
+                        {col.label}
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {noVidaRows.length === 0 && (
-                  <tr><td colSpan={10} className="text-center py-12 text-slate-400">Sin datos</td></tr>
-                )}
-                {noVidaRows.map((r, i) => (
-                  <tr key={i} className={`border-b border-slate-100 hover:bg-slate-50 ${r.lob === 'Total' ? 'font-semibold bg-slate-50' : ''}`}>
-                    <td className="px-4 py-2.5">{lob === 'Total' ? r.lob : r.ramo || '—'}</td>
-                    <td className="px-4 py-2.5 text-slate-500 text-xs">{r.subramo || '—'}</td>
-                    <td className="px-4 py-2.5 text-right">{fmt(r.pol)}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className={r.net_inflow != null && r.net_inflow >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                        {r.net_inflow != null ? (r.net_inflow >= 0 ? '+' : '') + r.net_inflow : '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono">{fmt(r.gwp, 0)}</td>
-                    <td className="px-4 py-2.5 text-right"><Badge v={r.gwp_pct} /></td>
-                    <td className="px-4 py-2.5 text-right">{fmt(r.np)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono">{fmt(r.gwpnp, 0)}</td>
-                    <td className="px-4 py-2.5 text-right"><Badge v={r.var_gwpnp_pct} /></td>
-                    <td className="px-4 py-2.5 text-right text-xs">
-                      {r.siniestralidad_sin_ibnr != null ? (r.siniestralidad_sin_ibnr * 100).toFixed(1) + '%' : '—'}
+                {displayNv.length === 0 && (
+                  <tr>
+                    <td colSpan={NV_COLS.length} className="text-center py-12 text-slate-400">
+                      Sin datos
                     </td>
                   </tr>
-                ))}
+                )}
+                {displayNv.map((item, idx) => {
+                  if (item.kind === 'section') {
+                    return (
+                      <tr key={`sec-${idx}`} className="bg-blue-50">
+                        <td
+                          colSpan={NV_COLS.length}
+                          className="py-1.5 px-3 text-xs font-semibold text-blue-800 uppercase tracking-wide sticky left-0 z-10 bg-blue-50"
+                        >
+                          {item.lob}
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  const row = item.row
+                  const totalRow = isTotal(row)
+                  const subtotalRow = isSubtotal(row)
+                  const rowBg = totalRow
+                    ? 'bg-slate-100 hover:bg-slate-200'
+                    : 'bg-white hover:bg-slate-50'
+                  const fontCls = totalRow ? 'font-bold' : ''
+
+                  return (
+                    <tr
+                      key={`row-${idx}`}
+                      className={`border-b border-slate-100 ${rowBg} ${fontCls}`}
+                    >
+                      {NV_COLS.map((col, i) => {
+                        const isSticky = i < STICKY
+                        const isNumeric = col.type !== 'text'
+                        const stickyBg = totalRow ? 'bg-slate-100' : 'bg-white'
+
+                        return (
+                          <td
+                            key={col.key}
+                            className={`py-1.5 px-3 whitespace-nowrap border-r border-slate-100 ${
+                              isNumeric ? 'text-right' : 'text-left'
+                            } ${isSticky ? `sticky z-10 ${stickyBg}` : ''}`}
+                            style={isSticky ? { left: stickyOffsets[i] } : undefined}
+                          >
+                            {renderCell(col, row[col.key], totalRow)}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* ── VIDA ────────────────────────────────────────────────────────── */}
       {!loading && tab === 'vida' && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Negocio</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">LOB</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Pólizas</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">GWP €</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Var GWP</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">APE €</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Prestac. €</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Cash Flow €</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vidaData.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-12 text-slate-400">Sin datos de Vida</td></tr>
-              )}
-              {vidaData.map((r, i) => (
-                <tr key={i} className={`border-b border-slate-100 hover:bg-slate-50 ${r.negocio === 'Total' && r.lob === 'Total' ? 'font-semibold bg-slate-50' : ''}`}>
-                  <td className="px-4 py-2.5">{r.negocio}</td>
-                  <td className="px-4 py-2.5 text-slate-500 text-xs">{r.lob}</td>
-                  <td className="px-4 py-2.5 text-right">{fmt(r.polizas)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(r.gwp, 0)}</td>
-                  <td className="px-4 py-2.5 text-right"><Badge v={r.var_gwp_pct} /></td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(r.ape, 0)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(r.prestaciones, 0)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono ${r.cash_flow != null && r.cash_flow >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {fmt(r.cash_flow, 0)}
-                  </td>
+        <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
+          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
+            <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
+              <thead>
+                <tr className="bg-[#003A8F] text-white">
+                  {V_COLS.map((col, i) => {
+                    const isSticky = i < 2
+                    const isNumeric = col.type !== 'text'
+                    const vidaStickyOffsets = [0, 96]
+                    return (
+                      <th
+                        key={col.key}
+                        className={`py-2 px-3 text-xs font-semibold whitespace-nowrap border-r border-blue-700 ${
+                          isNumeric ? 'text-right' : 'text-left'
+                        } ${isSticky ? 'sticky z-30 bg-[#003A8F]' : ''}`}
+                        style={isSticky ? { left: vidaStickyOffsets[i] } : undefined}
+                      >
+                        {col.label}
+                      </th>
+                    )
+                  })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {vData.length === 0 && (
+                  <tr>
+                    <td colSpan={V_COLS.length} className="text-center py-12 text-slate-400">
+                      Sin datos de Vida
+                    </td>
+                  </tr>
+                )}
+                {vData.map((row, idx) => {
+                  const totalRow =
+                    (row.negocio === 'Total' || row.negocio == null || row.negocio === '') &&
+                    (row.lob === 'Total' || row.lob == null || row.lob === '')
+                  const rowBg = totalRow
+                    ? 'bg-slate-100 hover:bg-slate-200'
+                    : 'bg-white hover:bg-slate-50'
+                  const fontCls = totalRow ? 'font-bold' : ''
+                  const vidaStickyOffsets = [0, 96]
+
+                  return (
+                    <tr
+                      key={idx}
+                      className={`border-b border-slate-100 ${rowBg} ${fontCls}`}
+                    >
+                      {V_COLS.map((col, i) => {
+                        const isSticky = i < 2
+                        const isNumeric = col.type !== 'text'
+                        const stickyBg = totalRow ? 'bg-slate-100' : 'bg-white'
+
+                        return (
+                          <td
+                            key={col.key}
+                            className={`py-1.5 px-3 whitespace-nowrap border-r border-slate-100 ${
+                              isNumeric ? 'text-right' : 'text-left'
+                            } ${isSticky ? `sticky z-10 ${stickyBg}` : ''}`}
+                            style={isSticky ? { left: vidaStickyOffsets[i] } : undefined}
+                          >
+                            {renderCell(col, row[col.key], totalRow)}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
