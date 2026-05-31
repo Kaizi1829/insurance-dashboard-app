@@ -326,7 +326,7 @@ export default function HomePage() {
     : null
   const prevCor = previousData ? toNumber(previousData?.medofis?.cor) : null
 
-  const prodSalud = toNumber(data?.produccion?.particulares?.salud)
+  const prodSalud = toNumber(data?.produccion?.salud?.total)
   const prodVida = toNumber(data?.produccion?.vida?.individual)
 
   const carteraData = [
