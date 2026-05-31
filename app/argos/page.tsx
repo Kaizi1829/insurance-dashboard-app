@@ -428,33 +428,29 @@ export default function ArgosPage() {
                   </tr>
                 )}
                 {rows.map((row, idx) => {
-                  // En Total IARD: solo el gran total (lob='Total') va en negrita/gris
-                  // Las filas de LOB (PARTICULARES/Total, etc.) van con fondo alternado
+                  // Único total en gris: el gran total (lob='Total')
+                  // En Total IARD, los totales de LOB (PARTICULARES/Total, etc.) van en blanco
                   const isGrandTotal = row.lob === 'Total'
-                  const isLobTotal = lob !== 'TOTAL_IARD' && isTotal(row)
-                  const isBold = isGrandTotal || isLobTotal
-                  const rowBg = isGrandTotal
-                    ? 'bg-[#003A8F] text-white hover:bg-[#002d70]'
-                    : isLobTotal
-                    ? 'bg-slate-100 hover:bg-slate-200'
-                    : idx % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50 hover:bg-slate-100'
-                  const fontCls = isBold ? 'font-bold' : ''
+                  const isRegularTotal = lob !== 'TOTAL_IARD' && isTotal(row)
+                  const showAsTotal = isGrandTotal || isRegularTotal
+                  const rowBg = showAsTotal ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white hover:bg-slate-50'
+                  const fontCls = showAsTotal ? 'font-bold' : ''
                   return (
                     <tr key={idx} className={`border-b border-slate-100 ${rowBg} ${fontCls}`}>
                       {NV_COLS_AGG.map((col, i) => {
                         const isSticky = i < STICKY
                         const isNumeric = col.type !== 'text'
-                        const stickyBg = isGrandTotal ? 'bg-[#003A8F]' : isLobTotal ? 'bg-slate-100' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                        const stickyBg = showAsTotal ? 'bg-slate-100' : 'bg-white'
 
                         return (
                           <td
                             key={col.key}
                             className={`py-1.5 px-3 whitespace-nowrap border-r border-slate-100 ${
                               isNumeric ? 'text-right' : 'text-left'
-                            } ${isSticky ? `sticky z-10 ${stickyBg}` : ''} ${isGrandTotal ? 'text-white' : ''}`}
+                            } ${isSticky ? `sticky z-10 ${stickyBg}` : ''}`}
                             style={isSticky ? { left: i === 0 ? 0 : 96 } : undefined}
                           >
-                            {renderCell(col, row[col.key], isBold)}
+                            {renderCell(col, row[col.key], showAsTotal)}
                           </td>
                         )
                       })}
