@@ -227,13 +227,63 @@ function renderCell(
   )
 }
 
+// ─── LOB tabs ─────────────────────────────────────────────────────────────────
+type LobTab = 'PARTICULARES' | 'EMPRESAS' | 'SALUD' | 'VIDA'
+const LOB_TABS: { key: LobTab; label: string }[] = [
+  { key: 'PARTICULARES', label: 'Particulares' },
+  { key: 'EMPRESAS',     label: 'Empresa'      },
+  { key: 'SALUD',        label: 'Salud'         },
+  { key: 'VIDA',         label: 'Vida'          },
+]
+
+// ─── Aggregate subramos → ramo level ─────────────────────────────────────────
+const SUM_COLS = ['np','np_ant','pol','net_inflow','gwp','gwpa','gwpnp','gwpnpa',
+  'primas_adq','sccy','sccy_ant','dif_sccy','sccy_leves','sccy_leves_ant',
+  'dif_sccy_leves','importe_cor','margen_ytd']
+
+function aggregateByRamo(rows: Row[], lob: string): Row[] {
+  const lobRows = rows.filter(r => r.lob === lob && r.ramo !== 'Total' && r.ramo != null && r.ramo !== '')
+  const totalRow = rows.find(r => r.lob === lob && r.ramo === 'Total')
+
+  const byRamo = new Map<string, Row[]>()
+  for (const r of lobRows) {
+    const key = r.ramo || ''
+    if (!byRamo.has(key)) byRamo.set(key, [])
+    byRamo.get(key)!.push(r)
+  }
+
+  const result: Row[] = []
+  for (const [, group] of byRamo.entries()) {
+    if (group.length === 1) {
+      result.push({ ...group[0], subramo: null })
+    } else {
+      const agg: Row = { ...group[0], subramo: null }
+      for (const key of SUM_COLS) {
+        const hasAny = group.some(r => r[key] != null)
+        agg[key] = hasAny ? group.reduce((s, r) => s + (r[key] != null ? Number(r[key]) : 0), 0) : null
+      }
+      // pct/ratio cols can't be summed — clear them
+      for (const k of Object.keys(agg)) {
+        if (!SUM_COLS.includes(k) && !['lob','ramo','subramo','year','month','medor_code','medofis_code'].includes(k)) {
+          agg[k] = null
+        }
+      }
+      result.push(agg)
+    }
+  }
+
+  result.sort((a, b) => (a.ramo || '').localeCompare(b.ramo || '', 'es'))
+  if (totalRow) result.push(totalRow)
+  return result
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ArgosPage() {
   const [medofis, setMedofis] = useState('MEDOR')
   const [nvData, setNvData] = useState<Row[]>([])
   const [vData, setVData] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState<'novida' | 'vida'>('novida')
+  const [lob, setLob] = useState<LobTab>('PARTICULARES')
 
   useEffect(() => {
     setLoading(true)
@@ -249,26 +299,14 @@ export default function ArgosPage() {
     }).catch(() => setLoading(false))
   }, [medofis])
 
-  // Build grouped No Vida rows with section headers
-  const sortedNv = sortNoVida(nvData)
+  // Aggregate rows for the selected LOB tab
+  const displayNvRows = lob !== 'VIDA' ? aggregateByRamo(nvData, lob) : []
 
-  type DisplayRow =
-    | { kind: 'section'; lob: string }
-    | { kind: 'data'; row: Row }
+  // NV_COLS without Subramo for the aggregated view (col index 2)
+  const NV_COLS_AGG = NV_COLS.filter(c => c.key !== 'subramo')
 
-  const displayNv: DisplayRow[] = []
-  let lastLob = ''
-  for (const row of sortedNv) {
-    const lob = row.lob || 'Total'
-    if (lob !== lastLob) {
-      displayNv.push({ kind: 'section', lob })
-      lastLob = lob
-    }
-    displayNv.push({ kind: 'data', row })
-  }
-
-  // Sticky column count (LoB, Ramo, Subramo)
-  const STICKY = 3
+  // Sticky column count (LoB, Ramo — no Subramo in aggregated view)
+  const STICKY = 2
 
   const stickyTh = (i: number) =>
     i < STICKY
@@ -299,19 +337,19 @@ export default function ArgosPage() {
         </select>
       </div>
 
-      {/* Tab switcher */}
+      {/* LOB tab switcher */}
       <div className="border-b border-slate-200 flex">
-        {(['novida', 'vida'] as const).map(t => (
+        {LOB_TABS.map(t => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.key}
+            onClick={() => setLob(t.key)}
             className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t
+              lob === t.key
                 ? 'border-[#003A8F] text-[#003A8F]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {t === 'novida' ? 'No Vida' : 'Vida'}
+            {t.label}
           </button>
         ))}
       </div>
@@ -321,13 +359,13 @@ export default function ArgosPage() {
       )}
 
       {/* ── NO VIDA ─────────────────────────────────────────────────────── */}
-      {!loading && tab === 'novida' && (
+      {!loading && lob !== 'VIDA' && (
         <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
           <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
             <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
               <thead>
                 <tr className="bg-[#003A8F] text-white">
-                  {NV_COLS.map((col, i) => {
+                  {NV_COLS_AGG.map((col, i) => {
                     const isSticky = i < STICKY
                     const isNumeric = col.type !== 'text'
                     return (
@@ -336,7 +374,7 @@ export default function ArgosPage() {
                         className={`py-2 px-3 text-xs font-semibold whitespace-nowrap border-r border-blue-700 ${
                           isNumeric ? 'text-right' : 'text-left'
                         } ${isSticky ? 'sticky z-30 bg-[#003A8F]' : ''}`}
-                        style={isSticky ? { left: stickyOffsets[i] } : undefined}
+                        style={isSticky ? { left: i === 0 ? 0 : 96 } : undefined}
                       >
                         {col.label}
                       </th>
@@ -345,41 +383,20 @@ export default function ArgosPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayNv.length === 0 && (
+                {displayNvRows.length === 0 && (
                   <tr>
-                    <td colSpan={NV_COLS.length} className="text-center py-12 text-slate-400">
+                    <td colSpan={NV_COLS_AGG.length} className="text-center py-12 text-slate-400">
                       Sin datos
                     </td>
                   </tr>
                 )}
-                {displayNv.map((item, idx) => {
-                  if (item.kind === 'section') {
-                    return (
-                      <tr key={`sec-${idx}`} className="bg-blue-50">
-                        <td
-                          colSpan={NV_COLS.length}
-                          className="py-1.5 px-3 text-xs font-semibold text-blue-800 uppercase tracking-wide sticky left-0 z-10 bg-blue-50"
-                        >
-                          {item.lob}
-                        </td>
-                      </tr>
-                    )
-                  }
-
-                  const row = item.row
+                {displayNvRows.map((row, idx) => {
                   const totalRow = isTotal(row)
-                  const subtotalRow = isSubtotal(row)
-                  const rowBg = totalRow
-                    ? 'bg-slate-100 hover:bg-slate-200'
-                    : 'bg-white hover:bg-slate-50'
+                  const rowBg = totalRow ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white hover:bg-slate-50'
                   const fontCls = totalRow ? 'font-bold' : ''
-
                   return (
-                    <tr
-                      key={`row-${idx}`}
-                      className={`border-b border-slate-100 ${rowBg} ${fontCls}`}
-                    >
-                      {NV_COLS.map((col, i) => {
+                    <tr key={idx} className={`border-b border-slate-100 ${rowBg} ${fontCls}`}>
+                      {NV_COLS_AGG.map((col, i) => {
                         const isSticky = i < STICKY
                         const isNumeric = col.type !== 'text'
                         const stickyBg = totalRow ? 'bg-slate-100' : 'bg-white'
@@ -390,7 +407,7 @@ export default function ArgosPage() {
                             className={`py-1.5 px-3 whitespace-nowrap border-r border-slate-100 ${
                               isNumeric ? 'text-right' : 'text-left'
                             } ${isSticky ? `sticky z-10 ${stickyBg}` : ''}`}
-                            style={isSticky ? { left: stickyOffsets[i] } : undefined}
+                            style={isSticky ? { left: i === 0 ? 0 : 96 } : undefined}
                           >
                             {renderCell(col, row[col.key], totalRow)}
                           </td>
@@ -406,7 +423,7 @@ export default function ArgosPage() {
       )}
 
       {/* ── VIDA ────────────────────────────────────────────────────────── */}
-      {!loading && tab === 'vida' && (
+      {!loading && lob === 'VIDA' && (
         <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
           <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
             <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
