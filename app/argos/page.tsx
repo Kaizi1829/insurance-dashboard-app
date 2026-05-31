@@ -300,15 +300,18 @@ function aggregateByRamo(rows: Row[], lob: string): Row[] {
     if (group.length === 1) {
       result.push({ ...group[0], subramo: null })
     } else {
-      const agg: Row = { ...group[0], subramo: null }
+      // Usar el subramo dominante (mayor GWP) para las columnas de porcentaje
+      const dominant = group.reduce((best, r) =>
+        (Number(r.gwp) || 0) > (Number(best.gwp) || 0) ? r : best
+      , group[0])
+
+      // Empezar con los valores del subramo dominante (preserva los %)
+      const agg: Row = { ...dominant, subramo: null }
+
+      // Sumar las columnas absolutas de todos los subramos
       for (const key of SUM_COLS) {
         const hasAny = group.some(r => r[key] != null)
         agg[key] = hasAny ? group.reduce((s, r) => s + (r[key] != null ? Number(r[key]) : 0), 0) : null
-      }
-      for (const k of Object.keys(agg)) {
-        if (!SUM_COLS.includes(k) && !['lob','ramo','subramo','year','month','medor_code','medofis_code'].includes(k)) {
-          agg[k] = null
-        }
       }
       result.push(agg)
     }
