@@ -228,12 +228,13 @@ function renderCell(
 }
 
 // ─── LOB tabs ─────────────────────────────────────────────────────────────────
-type LobTab = 'PARTICULARES' | 'EMPRESAS' | 'SALUD' | 'VIDA'
+type LobTab = 'PARTICULARES' | 'EMPRESAS' | 'SALUD' | 'TOTAL_IARD' | 'VIDA'
 const LOB_TABS: { key: LobTab; label: string }[] = [
   { key: 'PARTICULARES', label: 'Particulares' },
   { key: 'EMPRESAS',     label: 'Empresa'      },
-  { key: 'SALUD',        label: 'Salud'         },
-  { key: 'VIDA',         label: 'Vida'          },
+  { key: 'SALUD',        label: 'Salud'        },
+  { key: 'TOTAL_IARD',   label: 'Total IARD'   },
+  { key: 'VIDA',         label: 'Vida'         },
 ]
 
 // ─── Aggregate subramos → ramo level ─────────────────────────────────────────
@@ -300,7 +301,20 @@ export default function ArgosPage() {
   }, [medofis])
 
   // Aggregate rows for the selected LOB tab
-  const displayNvRows = lob !== 'VIDA' ? aggregateByRamo(nvData, lob) : []
+  const displayNvRows: Row[] = (() => {
+    if (lob === 'VIDA' || lob === 'TOTAL_IARD') return []
+    return aggregateByRamo(nvData, lob)
+  })()
+
+  // Total IARD: one row per LOB total + grand total
+  const totalIardRows: Row[] = (() => {
+    if (lob !== 'TOTAL_IARD') return []
+    const lobTotals = ['PARTICULARES', 'EMPRESAS', 'SALUD']
+      .map(l => nvData.find(r => r.lob === l && r.ramo === 'Total'))
+      .filter(Boolean) as Row[]
+    const grandTotal = nvData.find(r => r.lob === 'Total' && (r.ramo == null || r.ramo === ''))
+    return grandTotal ? [...lobTotals, grandTotal] : lobTotals
+  })()
 
   // NV_COLS without Subramo for the aggregated view (col index 2)
   const NV_COLS_AGG = NV_COLS.filter(c => c.key !== 'subramo')
@@ -359,7 +373,9 @@ export default function ArgosPage() {
       )}
 
       {/* ── NO VIDA ─────────────────────────────────────────────────────── */}
-      {!loading && lob !== 'VIDA' && (
+      {!loading && lob !== 'VIDA' && (() => {
+        const rows = lob === 'TOTAL_IARD' ? totalIardRows : displayNvRows
+        return (
         <div className="rounded-xl border border-slate-200 shadow-sm bg-white overflow-hidden">
           <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
             <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
@@ -383,14 +399,14 @@ export default function ArgosPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayNvRows.length === 0 && (
+                {rows.length === 0 && (
                   <tr>
                     <td colSpan={NV_COLS_AGG.length} className="text-center py-12 text-slate-400">
                       Sin datos
                     </td>
                   </tr>
                 )}
-                {displayNvRows.map((row, idx) => {
+                {rows.map((row, idx) => {
                   const totalRow = isTotal(row)
                   const rowBg = totalRow ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white hover:bg-slate-50'
                   const fontCls = totalRow ? 'font-bold' : ''
@@ -420,7 +436,8 @@ export default function ArgosPage() {
             </table>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* ── VIDA ────────────────────────────────────────────────────────── */}
       {!loading && lob === 'VIDA' && (
