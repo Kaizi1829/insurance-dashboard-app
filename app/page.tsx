@@ -35,6 +35,8 @@ const COLORS = [
   "#9FE3B0", // PSC
 ]
 
+const MEDOFIS_COLORS = ["#003A8F", "#F6D88A", "#9CC3FF", "#9FE3B0", "#C8A2FF", "#F6A6A6"]
+
 const MONTHS = [
   "Enero",
   "Febrero",
@@ -275,6 +277,24 @@ export default function HomePage() {
     }
   }, [data])
 
+  // Composición cartera por MEDOFIS — debe ir ANTES del early return
+  const medofisCarteraData = useMemo(() => {
+    if (!metrics.length || !data) return []
+    const lastMonth = Number(data.month)
+    return metrics
+      .filter((m: any) =>
+        Number(m.year) === year &&
+        Number(m.month) === lastMonth &&
+        getMediatorCode(m) !== "GLOBAL" &&
+        toNumber(m.medofis?.gwp) > 0
+      )
+      .map((m: any) => ({
+        name: `MEDOFIS ${getMediatorCode(m)}`,
+        value: toNumber(m.medofis?.gwp),
+      }))
+      .sort((a: any, b: any) => b.value - a.value)
+  }, [metrics, year, data])
+
   if (!data) {
     return (
       <div className="space-y-8">
@@ -337,25 +357,6 @@ export default function HomePage() {
     { name: "Ahorro",       value: toNumber(data?.cartera?.vida?.ahorro) },
     { name: "PSC",          value: toNumber(data?.cartera?.psc?.total) },
   ].filter((item) => item.value > 0)
-
-  // Composición cartera por MEDOFIS (sub-oficinas)
-  const MEDOFIS_COLORS = ["#003A8F", "#F6D88A", "#9CC3FF", "#9FE3B0", "#C8A2FF", "#F6A6A6"]
-  const medofisCarteraData = useMemo(() => {
-    if (!metrics.length || !data) return []
-    const lastMonth = Number(data.month)
-    return metrics
-      .filter((m: any) =>
-        Number(m.year) === year &&
-        Number(m.month) === lastMonth &&
-        getMediatorCode(m) !== "GLOBAL" &&
-        toNumber(m.medofis?.gwp) > 0
-      )
-      .map((m: any) => ({
-        name: `MEDOFIS ${getMediatorCode(m)}`,
-        value: toNumber(m.medofis?.gwp),
-      }))
-      .sort((a: any, b: any) => b.value - a.value)
-  }, [metrics, year, data])
 
   const objRapel = objetivos?.rapelAnual || {
     crecimientoMin: 0,
