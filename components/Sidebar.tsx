@@ -7,6 +7,7 @@ import {
   TrendingUp,
   ClipboardList,
   Target,
+  Calculator,
   type LucideIcon,
 } from "lucide-react"
 
@@ -49,6 +50,11 @@ const menuGroups: MenuGroup[] = [
         label: "ARGOS",
         href: "/argos" as Route,
         icon: ClipboardList,
+      },
+      {
+        label: "Cuenta Explotación",
+        href: "/explotacion" as Route,
+        icon: Calculator,
       },
       {
         label: "Objetivos",
