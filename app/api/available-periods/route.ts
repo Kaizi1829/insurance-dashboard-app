@@ -41,8 +41,8 @@ export async function GET() {
   const latestArgos = argosPeriods[0] ?? null
   const latestMetrics = metricsPeriods[0] ?? null
 
-  return NextResponse.json({
-    argos: { periods: argosPeriods, latest: latestArgos },
-    metrics: { periods: metricsPeriods, latest: latestMetrics },
-  })
+  return NextResponse.json(
+    { argos: { periods: argosPeriods, latest: latestArgos }, metrics: { periods: metricsPeriods, latest: latestMetrics } },
+    { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+  )
 }
