@@ -338,6 +338,25 @@ export default function HomePage() {
     { name: "PSC",          value: toNumber(data?.cartera?.psc?.total) },
   ].filter((item) => item.value > 0)
 
+  // Composición cartera por MEDOFIS (sub-oficinas)
+  const MEDOFIS_COLORS = ["#003A8F", "#F6D88A", "#9CC3FF", "#9FE3B0", "#C8A2FF", "#F6A6A6"]
+  const medofisCarteraData = useMemo(() => {
+    if (!metrics.length || !data) return []
+    const lastMonth = Number(data.month)
+    return metrics
+      .filter((m: any) =>
+        Number(m.year) === year &&
+        Number(m.month) === lastMonth &&
+        getMediatorCode(m) !== "GLOBAL" &&
+        toNumber(m.medofis?.gwp) > 0
+      )
+      .map((m: any) => ({
+        name: `MEDOFIS ${getMediatorCode(m)}`,
+        value: toNumber(m.medofis?.gwp),
+      }))
+      .sort((a: any, b: any) => b.value - a.value)
+  }, [metrics, year, data])
+
   const objRapel = objetivos?.rapelAnual || {
     crecimientoMin: 0,
     devolucionesMax: 2,
@@ -525,6 +544,39 @@ export default function HomePage() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {medofisCarteraData.length > 0 && (
+            <div className="panel">
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  Cartera por MEDOFIS <span className="text-slate-400">(GWP)</span>
+                </h3>
+                <p className="mt-1 text-sm text-slate-400">% de cartera total por sub-oficina</p>
+              </div>
+              <div className="mt-4 h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={medofisCarteraData}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={90}
+                      innerRadius={44}
+                      minAngle={2}
+                      label={percentLabel}
+                      labelLine={false}
+                    >
+                      {medofisCarteraData.map((_: any, index: number) => (
+                        <Cell key={index} fill={MEDOFIS_COLORS[index % MEDOFIS_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => formatEuros(v)} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           <div className="panel">
             <div>
