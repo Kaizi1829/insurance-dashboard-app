@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 type Tipo = 'real' | 'prevision'
@@ -73,28 +73,52 @@ function semaforo(ratio: number, type: 'beneficio' | 'solvencia' | 'comision' | 
 function EditCell({ value, onSave }: { value: number; onSave: (v: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editing])
+
+  const confirm = () => {
+    const val = n(raw.replace(/\./g, '').replace(',', '.'))
+    onSave(val)
+    setEditing(false)
+  }
+
+  const cancel = () => setEditing(false)
 
   if (editing) {
     return (
       <input
-        autoFocus
-        className="w-full text-right border border-blue-400 rounded px-1 py-0.5 text-xs"
+        ref={inputRef}
+        style={{
+          width: '100%', textAlign: 'right', border: '2px solid #003A8F',
+          borderRadius: 6, padding: '3px 6px', fontSize: 12, outline: 'none',
+          background: '#eff6ff', color: '#003A8F', fontWeight: 600,
+        }}
         value={raw}
         onChange={e => setRaw(e.target.value)}
-        onBlur={() => { onSave(n(raw.replace(',', '.'))); setEditing(false) }}
+        onBlur={confirm}
         onKeyDown={e => {
-          if (e.key === 'Enter') { onSave(n(raw.replace(',', '.'))); setEditing(false) }
-          if (e.key === 'Escape') setEditing(false)
+          if (e.key === 'Enter')  { e.preventDefault(); confirm() }
+          if (e.key === 'Escape') { e.preventDefault(); cancel()  }
         }}
       />
     )
   }
+
   return (
     <span
-      className="cursor-pointer hover:text-blue-600 hover:underline"
+      title="Haz clic para editar"
+      style={{ cursor: 'pointer', padding: '2px 4px', borderRadius: 4, display: 'inline-block', minWidth: 60, textAlign: 'right' }}
+      onMouseEnter={e => (e.currentTarget.style.background = '#eff6ff')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       onClick={() => { setRaw(value ? String(value) : ''); setEditing(true) }}
     >
-      {value ? fmtEuro(value) : <span className="text-slate-300">—</span>}
+      {value ? fmtEuro(value) : <span style={{ color: '#94a3b8' }}>— clic para editar</span>}
     </span>
   )
 }
