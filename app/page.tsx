@@ -289,7 +289,7 @@ export default function HomePage() {
         toNumber(m.medofis?.gwp) > 0
       )
       .map((m: any) => ({
-        name: `MEDOFIS ${getMediatorCode(m)}`,
+        name: getMediatorCode(m),
         value: toNumber(m.medofis?.gwp),
       }))
       .sort((a: any, b: any) => b.value - a.value)
