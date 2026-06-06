@@ -299,7 +299,7 @@ export default function HomePage() {
       { name: "General Account", ...vidaByLob(v, "General Account"), color: COLORS[3], isHighlighted: false },
       { name: "Unit Linked",     ...vidaByLob(v, "Unit Linked"),      color: COLORS[3], isHighlighted: false },
       { name: "Protection w/s",  ...vidaByLob(v, "Protection w/s"),   color: COLORS[3], isHighlighted: false },
-      { name: "Total Ahorro", actual: ahorroAct, anterior: ahorroAnt, color: COLORS[3], isHighlighted: true },
+      { name: "Total Ahorro", actual: ahorroAct, anterior: ahorroAnt, color: COLORS[3], isHighlighted: true, ...NO_EXTRA },
     ]
 
     return {
@@ -597,11 +597,11 @@ function Kpi({
   type: "money"|"renovacion"|"tnp"|"crecimiento"|"cor"|"siniestralidad"
 }) {
   function color() {
-    if (type === "renovacion")   return raw < 70 ? "text-red-600" : raw <= 90 ? "text-orange-500" : "text-green-600"
-    if (type === "tnp")          return raw < 10 ? "text-red-600" : raw < 15  ? "text-orange-500" : "text-green-600"
-    if (type === "crecimiento")  return raw < 0  ? "text-red-600" : raw <= 5  ? "text-orange-500" : "text-green-600"
-    if (type === "cor")          return raw > 100 ? "text-red-600" : "text-green-600"
-    if (type === "siniestralidad") return raw > 80 ? "text-red-600" : raw > 60 ? "text-orange-500" : "text-green-600"
+    if (type === "renovacion")    return raw < 70   ? "text-red-600" : raw <= 90  ? "text-orange-500" : "text-green-600"
+    if (type === "tnp")           return raw < 12.5 ? "text-red-600" : raw < 15   ? "text-orange-500" : "text-green-600"  // contrato: <12.5=0%, 12.5-15=70%, ≥15=100%
+    if (type === "crecimiento")   return raw <= 0   ? "text-red-600" : "text-green-600"  // contrato: debe ser >0
+    if (type === "cor")           return raw >= 100 ? "text-red-600" : "text-green-600"  // contrato: <100%
+    if (type === "siniestralidad") return raw > 80  ? "text-red-600" : raw > 60  ? "text-orange-500" : "text-green-600"
     return "text-[#003A8F]"
   }
 
@@ -702,7 +702,9 @@ function ProductionTable({ title, data }: {
                     )}
                   </span>
                   <span className="text-right">
-                    TNP <span className="font-semibold text-slate-600">{item.tasaNp.toFixed(1)}%</span>
+                    TNP <span className={`font-semibold ${
+                      item.tasaNp < 12.5 ? "text-red-500" : item.tasaNp < 15 ? "text-orange-500" : "text-emerald-600"
+                    }`}>{item.tasaNp.toFixed(1)}%</span>
                   </span>
                   <span className="text-right">
                     PM <span className="font-semibold text-slate-600">{item.primMedia > 0 ? fmtEuros(item.primMedia) : "—"}</span>
