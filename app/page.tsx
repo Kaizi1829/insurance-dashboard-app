@@ -665,56 +665,48 @@ function ProductionTable({ title, data }: {
           <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
           {title}
         </h4>
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
           <span>Ramo</span>
           <span className="text-right">Año ant.</span>
           <span className="text-right">Actual</span>
-          <span className="text-right">Var. %</span>
+          <span className="text-right">Var.</span>
+          <span className="text-right">TNP%</span>
+          <span className="text-right">Pólizas</span>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {data.map((item, i) => (
-            <div key={i} className={`rounded-lg border transition-colors ${
+            <div key={i} className={`grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr_1fr] items-center px-2 py-1.5 rounded-lg border transition-colors ${
               item.isHighlighted ? "bg-slate-50 border-slate-200" : "border-transparent hover:bg-slate-50"
             }`}>
-              {/* Main row */}
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr] items-center px-2 py-1.5">
-                <span
-                  className={`text-sm truncate ${item.isHighlighted ? "font-bold" : "font-medium text-slate-700"}`}
-                  style={{ color: item.isHighlighted ? item.color : undefined }}
-                >
-                  {item.name}
-                </span>
-                <span className="text-right text-xs text-slate-400">{fmtEuros(item.anterior)}</span>
-                <span className={`text-right text-sm font-semibold ${item.isHighlighted ? "text-slate-900" : "text-slate-800"}`}>
-                  {fmtEuros(item.actual)}
-                </span>
-                <VarBadge actual={item.actual} anterior={item.anterior} />
-              </div>
-              {/* Sub-row: pólizas, TNP%, prima media, neto */}
-              {(item.np > 0 || item.tasaNp > 0) && (
-                <div className="grid grid-cols-4 gap-x-2 px-2 pb-1.5 text-[10px] text-slate-400">
-                  <span>
-                    <span className="font-semibold text-slate-600">{Math.round(item.np)}</span> pól.
-                    {item.np_ant > 0 && (
-                      <span className={`ml-1 ${item.np >= item.np_ant ? "text-emerald-500" : "text-red-400"}`}>
-                        ({item.np >= item.np_ant ? "▲" : "▼"}{Math.abs(item.np - item.np_ant).toFixed(0)})
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-right">
-                    TNP <span className={`font-semibold ${
-                      item.tasaNp < 12.5 ? "text-red-500" : item.tasaNp < 15 ? "text-orange-500" : "text-emerald-600"
-                    }`}>{item.tasaNp.toFixed(1)}%</span>
-                  </span>
-                  <span className="text-right">
-                    PM <span className="font-semibold text-slate-600">{item.primMedia > 0 ? fmtEuros(item.primMedia) : "—"}</span>
-                  </span>
-                  <span className="text-right">
-                    Neto <span className={`font-semibold ${item.netInflow >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                      {item.netInflow >= 0 ? "+" : ""}{Math.round(item.netInflow)}
+              <span
+                className={`text-sm truncate ${item.isHighlighted ? "font-bold" : "font-medium text-slate-700"}`}
+                style={{ color: item.isHighlighted ? item.color : undefined }}
+              >
+                {item.name}
+              </span>
+              <span className="text-right text-xs text-slate-400">{fmtEuros(item.anterior)}</span>
+              <span className={`text-right text-xs font-semibold ${item.isHighlighted ? "text-slate-900" : "text-slate-800"}`}>
+                {fmtEuros(item.actual)}
+              </span>
+              <VarBadge actual={item.actual} anterior={item.anterior} />
+              {item.tasaNp > 0 ? (
+                <span className={`text-right text-xs font-semibold ${
+                  item.tasaNp < 12.5 ? "text-red-500" : item.tasaNp < 15 ? "text-orange-500" : "text-emerald-600"
+                }`}>{item.tasaNp.toFixed(1)}%</span>
+              ) : (
+                <span className="text-right text-xs text-slate-300">—</span>
+              )}
+              {item.np > 0 ? (
+                <span className="text-right text-xs text-slate-600">
+                  <span className="font-semibold">{Math.round(item.np)}</span>
+                  {item.np_ant > 0 && (
+                    <span className={`ml-1 text-[10px] ${item.np >= item.np_ant ? "text-emerald-500" : "text-red-400"}`}>
+                      {item.np >= item.np_ant ? "▲" : "▼"}{Math.abs(item.np - item.np_ant).toFixed(0)}
                     </span>
-                  </span>
-                </div>
+                  )}
+                </span>
+              ) : (
+                <span className="text-right text-xs text-slate-300">—</span>
               )}
             </div>
           ))}
