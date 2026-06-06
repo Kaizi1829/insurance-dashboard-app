@@ -528,6 +528,90 @@ export default function ObjetivosPage() {
         )}
       </section>
 
+      {/* ── Calculadora de devengo máximo ── */}
+      <section className="overflow-hidden rounded-3xl border border-amber-200 bg-amber-50 shadow-panel">
+        <div className="px-6 py-5 border-b border-amber-200 flex items-center gap-3">
+          <span className="text-2xl">🧮</span>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Calculadora — si cerráramos el año hoy</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Asume todas las condiciones cumplidas · Crecimiento y TNP actuales mantenidos a cierre
+            </p>
+          </div>
+        </div>
+        <div className="p-6 space-y-6">
+          {/* Tabla de bloques con devengo máximo posible */}
+          <div className="overflow-hidden rounded-2xl border border-amber-200 bg-white">
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-4 py-2 border-b border-slate-100">
+              <span>Bloque</span>
+              <span className="text-right">GWP ant.</span>
+              <span className="text-right">GWP act.</span>
+              <span className="text-right">Crec. %</span>
+              <span className="text-right">Devengo</span>
+            </div>
+            {[
+              { label: "Salud Individual", gwpA: gwpSaludInd, gwpP: gwpSaludIndAnt, tabla: RAPEL_TABLAS_2026.saludInd },
+              { label: "Particulares",     gwpA: gwpPart,    gwpP: gwpPartAnt,    tabla: RAPEL_TABLAS_2026.particulares },
+              { label: "Empresas",         gwpA: gwpEmp,     gwpP: gwpEmpAnt,     tabla: RAPEL_TABLAS_2026.empresas },
+              { label: "PSC",              gwpA: gwpPsc,     gwpP: gwpPscAnt,     tabla: RAPEL_TABLAS_2026.psc },
+            ].map(({ label, gwpA, gwpP, tabla }) => {
+              const crec = gwpP > 0 ? ((gwpA - gwpP) / gwpP) * 100 : 0
+              const { tramo, devengo, devengoPotencial } = calcDevengoBloqueA(gwpA, crec, tabla)
+              const devTotal = devengoPotencial * 0.70 + devengoPotencial * 0.30 * tnpFactor
+              const sinDato = gwpP === 0
+              return (
+                <div key={label} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] items-center px-4 py-3 border-b border-slate-50 last:border-0">
+                  <span className="text-sm font-medium text-slate-700">{label}</span>
+                  <span className="text-right text-xs text-slate-400">{sinDato ? "—" : fmtE(gwpP)}</span>
+                  <span className="text-right text-sm font-medium">{fmtE(gwpA)}</span>
+                  <span className={`text-right text-sm font-bold ${
+                    sinDato ? "text-slate-400" : crec <= 0 ? "text-red-500" : crec < (label === "PSC" ? 25 : label === "Salud Individual" ? 6 : label === "Particulares" ? 5 : 4.5) ? "text-orange-500" : "text-emerald-600"
+                  }`}>
+                    {sinDato ? "—" : `${crec > 0 ? "+" : ""}${crec.toFixed(1)}%`}
+                  </span>
+                  <span className={`text-right text-sm font-bold ${devTotal > 0 ? "text-[#003A8F]" : "text-slate-300"}`}>
+                    {devTotal > 0 ? fmtE(devTotal) : "—"}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Resumen final */}
+          <div className="rounded-2xl border-2 border-[#003A8F] bg-white p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="text-sm text-slate-500">
+                Rapel estimado si se mantiene el ritmo actual y se cumplen todas las condiciones
+              </div>
+              <div className="flex gap-6 text-xs text-slate-400 justify-center sm:justify-start">
+                <span>Parte A: <strong className="text-slate-700">{fmtE(devengos.totalA)}</strong></span>
+                <span>Parte B: <strong className="text-slate-700">{fmtE(devengos.totalB)}</strong></span>
+                <span>TNP factor: <strong className={tnpFactor === 1 ? "text-emerald-600" : tnpFactor > 0 ? "text-orange-500" : "text-red-500"}>{(tnpFactor * 100).toFixed(0)}%</strong></span>
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-slate-400 mb-1">Total estimado</div>
+              <div className={`text-4xl font-bold ${
+                devengos.total >= CONDICIONES_2026.devengMin ? "text-[#003A8F]" : "text-slate-400"
+              }`}>{fmtE(devengos.total)}</div>
+              <div className="text-xs text-slate-400 mt-1">
+                {devengos.total >= CONDICIONES_2026.devengMax
+                  ? "⚠ Límite máximo alcanzado"
+                  : devengos.total >= CONDICIONES_2026.devengMin
+                  ? `Faltan ${fmtE(CONDICIONES_2026.devengMax - devengos.total)} para el máximo`
+                  : `Por debajo del mínimo de ${fmtE(CONDICIONES_2026.devengMin)}`}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-xs text-amber-700 flex gap-2 items-start">
+            <Info size={13} className="flex-shrink-0 mt-0.5"/>
+            Esta calculadora usa datos YTD. Si no hay datos del año anterior para un bloque, ese bloque no computa crecimiento.
+            El cálculo definitivo se realiza sobre el año completo cerrado.
+          </div>
+        </div>
+      </section>
+
       {/* ── Rapel cuatrimestral NP ── */}
       <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel">
         <div className="px-6 py-5 border-b border-slate-100">
