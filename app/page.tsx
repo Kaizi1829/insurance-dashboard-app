@@ -44,10 +44,10 @@ function fmtPct(v: any) {
 
 function getMediatorCode(m: any) { return m?.mediator_code ?? m?.mediatorCode ?? "" }
 
-// ─── Pie label — renders outside the arc, threshold 2 % ───────────────────────
+// ─── Pie label — renders outside the arc, no threshold ────────────────────────
 
 function PieLabel({ cx, cy, midAngle, outerRadius, percent }: any) {
-  if (!percent || percent < 0.02) return null
+  if (!percent || percent < 0.005) return null  // only skip truly invisible slivers
   const R = Math.PI / 180
   const r = outerRadius + 32
   const x = cx + r * Math.cos(-midAngle * R)
@@ -66,61 +66,89 @@ function PieLabel({ cx, cy, midAngle, outerRadius, percent }: any) {
 
 // ─── Production data helpers ──────────────────────────────────────────────────
 
-type NVRow  = { lob: string; ramo: string; subramo: string | null; gwpnp: any; gwpnpa: any }
-type VRow   = { lob: string; negocio: string; gwpnp: any; gwpnpa: any; gwp: any; gwpa: any }
+type NVRow   = { lob: string; ramo: string; subramo: string | null; gwpnp: any; gwpnpa: any }
+type VRow    = { lob: string; negocio: string; gwpnp: any; gwpnpa: any; gwp: any; gwpa: any }
 type ProdVal = { actual: number; anterior: number }
+type ProdRow = { name: string; actual: number; anterior: number; color: string; isHighlighted: boolean }
 
+function titleCase(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
+
+// Sum all subramo rows for a given lob + ramo (no 'Total' subramo exists in this schema)
 function nvRamo(rows: NVRow[], lob: string, ramo: string): ProdVal {
-  // Prefer the 'Total' subramo row; otherwise sum all
-  const total = rows.find(r => r.lob === lob && r.ramo === ramo && r.subramo === "Total")
-  if (total) return { actual: toNumber(total.gwpnp), anterior: toNumber(total.gwpnpa) }
-  const match = rows.filter(r => r.lob === lob && r.ramo === ramo)
+  const match = rows.filter(r =>
+    r.lob?.toUpperCase() === lob.toUpperCase() &&
+    r.ramo?.toUpperCase() === ramo.toUpperCase()
+  )
   return {
     actual:   match.reduce((s, r) => s + toNumber(r.gwpnp), 0),
     anterior: match.reduce((s, r) => s + toNumber(r.gwpnpa), 0),
   }
 }
 
+// Specific subramo row
 function nvSubramo(rows: NVRow[], lob: string, subramo: string): ProdVal {
-  const r = rows.find(r => r.lob === lob && r.subramo === subramo)
+  const r = rows.find(r =>
+    r.lob?.toUpperCase() === lob.toUpperCase() &&
+    r.subramo?.toUpperCase() === subramo.toUpperCase()
+  )
   return { actual: toNumber(r?.gwpnp), anterior: toNumber(r?.gwpnpa) }
 }
 
+// LOB total row (ramo='Total', subramo=null)
 function nvLob(rows: NVRow[], lob: string): ProdVal {
-  const r = rows.find(r => r.lob === lob && r.ramo === "Total" && !r.subramo)
+  const r = rows.find(r =>
+    r.lob?.toUpperCase() === lob.toUpperCase() &&
+    r.ramo === "Total" && !r.subramo
+  )
   if (r) return { actual: toNumber(r.gwpnp), anterior: toNumber(r.gwpnpa) }
-  // fallback: sum all 'Total' subramo rows for that LOB
-  const match = rows.filter(r => r.lob === lob && r.subramo === "Total")
-  return {
-    actual:   match.reduce((s, r) => s + toNumber(r.gwpnp), 0),
-    anterior: match.reduce((s, r) => s + toNumber(r.gwpnpa), 0),
-  }
+  // Fallback: sum all ramo-level rows
+  const uniqRamos = [...new Set(
+    rows.filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total").map(r => r.ramo)
+  )]
+  return uniqRamos.reduce((acc, ramo) => {
+    const v = nvRamo(rows, lob, ramo)
+    return { actual: acc.actual + v.actual, anterior: acc.anterior + v.anterior }
+  }, { actual: 0, anterior: 0 } as ProdVal)
 }
 
-function vidaLob(rows: VRow[], lob: string, negocio?: string): ProdVal {
+// Get all unique ramo names for a LOB (excluding 'Total')
+function nvRamos(rows: NVRow[], lob: string): string[] {
+  return [...new Set(
+    rows
+      .filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total")
+      .map(r => r.ramo)
+  )].sort()
+}
+
+// Build rows dynamically from whatever ramos exist for a LOB
+function buildLobRows(rows: NVRow[], lob: string, color: string): ProdRow[] {
+  const ramos = nvRamos(rows, lob)
+  const dataRows: ProdRow[] = ramos.map(ramo => ({
+    name: titleCase(ramo),
+    ...nvRamo(rows, lob, ramo),
+    color,
+    isHighlighted: false,
+  }))
+  dataRows.push({
+    name: `Total ${titleCase(lob)}`,
+    ...nvLob(rows, lob),
+    color,
+    isHighlighted: true,
+  })
+  return dataRows
+}
+
+// Vida / Ahorro by product (lob) and optionally by negocio (Individual / Colectivo)
+function vidaByLob(rows: VRow[], lob: string, negocio?: string): ProdVal {
   const match = rows.filter(r =>
     r.lob === lob && (!negocio || r.negocio === negocio)
   )
   return {
-    // For GA / UL, gwpnp may be null; fall back to gwp (premium volume)
     actual:   match.reduce((s, r) => s + toNumber(r.gwpnp ?? r.gwp), 0),
     anterior: match.reduce((s, r) => s + toNumber(r.gwpnpa ?? r.gwpa), 0),
   }
-}
-
-// Find ramo by partial/case-insensitive match
-function nvRamoFlex(rows: NVRow[], lob: string, ...candidates: string[]): ProdVal {
-  const lobUpper = lob.toUpperCase()
-  for (const c of candidates) {
-    const cu = c.toUpperCase()
-    const r = rows.find(r =>
-      r.lob.toUpperCase() === lobUpper &&
-      r.ramo.toUpperCase().includes(cu) &&
-      r.subramo === "Total"
-    )
-    if (r) return { actual: toNumber(r.gwpnp), anterior: toNumber(r.gwpnpa) }
-  }
-  return { actual: 0, anterior: 0 }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -207,49 +235,41 @@ export default function HomePage() {
     const nv = nvRows
     const v  = vidaRows
 
-    const ahorroProd = ["General Account","Unit Linked","Protection w/s"]
+    // Particulares & Empresa: dynamically discover ramos from real data
+    const partRows = buildLobRows(nv, "PARTICULARES", COLORS[0])
+    const empRows  = buildLobRows(nv, "EMPRESAS",     COLORS[1])
 
-    const ahorroAct = ahorroProd.reduce((s, lob) => s + vidaLob(v, lob).actual, 0)
-    const ahorroAnt = ahorroProd.reduce((s, lob) => s + vidaLob(v, lob).anterior, 0)
+    // Salud: always show Individual + Colectivo even if value=0
+    const saludRows: ProdRow[] = [
+      { name: "Individual", ...nvSubramo(nv, "SALUD", "SALUDIND"), color: COLORS[4], isHighlighted: false },
+      { name: "Colectivo",  ...nvSubramo(nv, "SALUD", "SALUDCOL"), color: COLORS[4], isHighlighted: false },
+      { name: "Total Salud", ...nvLob(nv, "SALUD"),                 color: COLORS[4], isHighlighted: true  },
+    ]
+
+    // Vida (Pure Protection): Individual + Colectivo — always show
+    const vidaGrupo: ProdRow[] = [
+      { name: "Individual", ...vidaByLob(v, "Pure Protection", "Individual"), color: COLORS[2], isHighlighted: false },
+      { name: "Colectivo",  ...vidaByLob(v, "Pure Protection", "Colectivo"),  color: COLORS[2], isHighlighted: false },
+      { name: "Total Vida", ...vidaByLob(v, "Pure Protection"),               color: COLORS[2], isHighlighted: true  },
+    ]
+
+    // Ahorro: GA + UL + Protection w/s
+    const ahorroProd = ["General Account", "Unit Linked", "Protection w/s"] as const
+    const ahorroAct  = ahorroProd.reduce((s, lob) => s + vidaByLob(v, lob).actual,   0)
+    const ahorroAnt  = ahorroProd.reduce((s, lob) => s + vidaByLob(v, lob).anterior, 0)
+    const ahorroRows: ProdRow[] = [
+      { name: "General Account", ...vidaByLob(v, "General Account"), color: COLORS[3], isHighlighted: false },
+      { name: "Unit Linked",     ...vidaByLob(v, "Unit Linked"),      color: COLORS[3], isHighlighted: false },
+      { name: "Protection w/s",  ...vidaByLob(v, "Protection w/s"),   color: COLORS[3], isHighlighted: false },
+      { name: "Total Ahorro", actual: ahorroAct, anterior: ahorroAnt, color: COLORS[3], isHighlighted: true },
+    ]
 
     return {
-      particulares: [
-        { name: "Auto",             ...nvRamoFlex(nv, "PARTICULARES", "AUTO"),            color: COLORS[0], isHighlighted: false },
-        { name: "Hogar",            ...nvRamoFlex(nv, "PARTICULARES", "HOGAR"),           color: COLORS[0], isHighlighted: false },
-        { name: "Decesos",          ...nvRamoFlex(nv, "PARTICULARES", "DECESOS"),         color: COLORS[0], isHighlighted: false },
-        { name: "RC Civil",         ...nvRamoFlex(nv, "PARTICULARES", "RESPONSABILIDAD","RC CIVIL","RCIVIL","CIVIL","RC"), color: COLORS[0], isHighlighted: false },
-        { name: "Comunidades",      ...nvRamoFlex(nv, "PARTICULARES", "COMUNIDADES"),     color: COLORS[0], isHighlighted: false },
-        { name: "Accidentes",       ...nvRamoFlex(nv, "PARTICULARES", "ACCIDENTES"),      color: COLORS[0], isHighlighted: false },
-        { name: "Total Particulares",...nvLob(nv, "PARTICULARES"),                        color: COLORS[0], isHighlighted: true  },
-      ].filter(r => r.actual > 0 || r.isHighlighted),
-
-      empresa: [
-        { name: "Flotas",    ...nvRamoFlex(nv, "EMPRESAS", "FLOTAS","FLOTA"),   color: COLORS[1], isHighlighted: false },
-        { name: "RC",        ...nvRamoFlex(nv, "EMPRESAS", "RESPONSABILIDAD","RC"), color: COLORS[1], isHighlighted: false },
-        { name: "Comercio",  ...nvRamoFlex(nv, "EMPRESAS", "COMERCIO"),         color: COLORS[1], isHighlighted: false },
-        { name: "Oficina",   ...nvRamoFlex(nv, "EMPRESAS", "OFICINA"),          color: COLORS[1], isHighlighted: false },
-        { name: "Industria", ...nvRamoFlex(nv, "EMPRESAS", "INDUSTRIA"),        color: COLORS[1], isHighlighted: false },
-        { name: "Total Empresa",...nvLob(nv, "EMPRESAS"),                        color: COLORS[1], isHighlighted: true  },
-      ].filter(r => r.actual > 0 || r.isHighlighted),
-
-      salud: [
-        { name: "Individual", ...nvSubramo(nv, "SALUD", "SALUDIND"), color: COLORS[4], isHighlighted: false },
-        { name: "Colectivo",  ...nvSubramo(nv, "SALUD", "SALUDCOL"), color: COLORS[4], isHighlighted: false },
-        { name: "Total Salud",...nvLob(nv, "SALUD"),                  color: COLORS[4], isHighlighted: true  },
-      ].filter(r => r.actual > 0 || r.isHighlighted),
-
-      vida: [
-        { name: "Vida Individual", ...vidaLob(v, "Pure Protection", "Individual"), color: COLORS[2], isHighlighted: false },
-        { name: "Vida Colectivo",  ...vidaLob(v, "Pure Protection", "Colectivo"),  color: COLORS[2], isHighlighted: false },
-        { name: "Total Vida",      ...vidaLob(v, "Pure Protection"),               color: COLORS[2], isHighlighted: true  },
-      ].filter(r => r.actual > 0 || r.isHighlighted),
-
-      ahorro: [
-        { name: "General Account", ...vidaLob(v, "General Account"), color: COLORS[3], isHighlighted: false },
-        { name: "Unit Linked",     ...vidaLob(v, "Unit Linked"),      color: COLORS[3], isHighlighted: false },
-        { name: "Protection w/s",  ...vidaLob(v, "Protection w/s"),   color: COLORS[3], isHighlighted: false },
-        { name: "Total Ahorro",    actual: ahorroAct, anterior: ahorroAnt, color: COLORS[3], isHighlighted: true },
-      ].filter(r => r.actual > 0 || r.isHighlighted),
+      particulares: partRows,
+      empresa:      empRows,
+      salud:        saludRows,
+      vida:         vidaGrupo,
+      ahorro:       ahorroRows,
     }
   }, [nvRows, vidaRows])
 
@@ -488,7 +508,7 @@ export default function HomePage() {
             <ProductionTable title="Particulares"  data={productionGroups.particulares} />
             <ProductionTable title="Empresa"       data={productionGroups.empresa} />
             <ProductionTable title="Salud"         data={productionGroups.salud} />
-            <ProductionTable title="Vida (Pure Protection)" data={productionGroups.vida} />
+            <ProductionTable title="Vida" data={productionGroups.vida} />
             <ProductionTable title="Ahorro"        data={productionGroups.ahorro} />
           </div>
         </div>
