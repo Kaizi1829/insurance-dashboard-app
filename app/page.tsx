@@ -594,38 +594,66 @@ function Kpi({
 
 // ─── Production Table ─────────────────────────────────────────────────────────
 
+function VarBadge({ actual, anterior }: { actual: number; anterior: number }) {
+  if (anterior === 0 && actual === 0) return <span className="text-slate-300 text-xs text-right block">—</span>
+  if (anterior === 0) return (
+    <span className="inline-flex justify-end">
+      <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 rounded-full px-2 py-0.5">NUEVO</span>
+    </span>
+  )
+  const pct = ((actual - anterior) / Math.abs(anterior)) * 100
+  const up  = pct >= 0
+  const color = up ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"
+  const arrow = up ? "▲" : "▼"
+  return (
+    <span className="inline-flex justify-end">
+      <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${color}`}>
+        {arrow} {Math.abs(pct).toFixed(1)}%
+      </span>
+    </span>
+  )
+}
+
 function ProductionTable({ title, data }: {
   title: string
   data: Array<{ name: string; actual: number; anterior: number; color: string; isHighlighted?: boolean }>
 }) {
+  const accentColor = data[0]?.color ?? "#003A8F"
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3">
-      <h4 className="font-semibold text-sm text-slate-700 mb-2">{title}</h4>
-      <div className="grid grid-cols-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
+    <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
+      <div className="p-3">
+      <h4 className="font-semibold text-sm text-slate-800 mb-2 flex items-center gap-2">
+        <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
+        {title}
+      </h4>
+      <div className="grid grid-cols-[2fr_1fr_1fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
         <span>Ramo</span>
-        <span className="text-right">Ant. (GWPNPA)</span>
-        <span className="text-right">Act. (GWPNP)</span>
-        <span className="text-right">Var.</span>
+        <span className="text-right">Año ant.</span>
+        <span className="text-right">Actual</span>
+        <span className="text-right">Var. %</span>
       </div>
       <div className="space-y-0.5">
-        {data.map((item, i) => {
-          const v = item.actual - item.anterior
-          const sign = v > 0 ? "+" : v < 0 ? "−" : ""
-          const vc   = v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-slate-400"
-          return (
-            <div key={i} className={`grid grid-cols-4 items-center px-2 py-1.5 rounded-lg border ${
-              item.isHighlighted ? "bg-white border-slate-200" : "border-transparent hover:bg-white/70"
-            }`}>
-              <span className={`text-sm ${item.isHighlighted ? "font-semibold" : "font-medium text-slate-700"}`}
-                style={{ color: item.isHighlighted ? item.color : undefined }}>
-                {item.name}
-              </span>
-              <span className="text-right text-sm text-slate-600">{fmtEuros(item.anterior)}</span>
-              <span className="text-right text-sm text-slate-900 font-medium">{fmtEuros(item.actual)}</span>
-              <span className={`text-right text-sm font-semibold ${vc}`}>{sign}{fmtEuros(Math.abs(v))}</span>
-            </div>
-          )
-        })}
+        {data.map((item, i) => (
+          <div key={i} className={`grid grid-cols-[2fr_1fr_1fr_1fr] items-center px-2 py-1.5 rounded-lg transition-colors ${
+            item.isHighlighted
+              ? "bg-slate-50 border border-slate-200"
+              : "border border-transparent hover:bg-slate-50"
+          }`}>
+            <span
+              className={`text-sm truncate ${item.isHighlighted ? "font-bold" : "font-medium text-slate-700"}`}
+              style={{ color: item.isHighlighted ? item.color : undefined }}
+            >
+              {item.name}
+            </span>
+            <span className="text-right text-xs text-slate-400">{fmtEuros(item.anterior)}</span>
+            <span className={`text-right text-sm font-semibold ${item.isHighlighted ? "text-slate-900" : "text-slate-800"}`}>
+              {fmtEuros(item.actual)}
+            </span>
+            <VarBadge actual={item.actual} anterior={item.anterior} />
+          </div>
+        ))}
+      </div>
       </div>
     </div>
   )
