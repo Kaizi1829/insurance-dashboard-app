@@ -1,240 +1,477 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import {
+  RAPEL_TABLAS_2026,
+  CONDICIONES_2026,
+  calcDevengoBloqueA,
+  type TramoRapel,
+} from "@/lib/objetivos"
+import {
+  CheckCircle2, XCircle, AlertCircle, TrendingUp, TrendingDown,
+  Minus, ChevronRight, Info,
+} from "lucide-react"
 
-const years = [2024, 2025, 2026, 2027]
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export default function Objetivos() {
-  const [year, setYear] = useState(2026)
-  const [data, setData] = useState<any>(null)
+const toN = (v: any) => (v === null || v === undefined || isNaN(Number(v)) ? 0 : Number(v))
+const fmtE = (v: number) =>
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v)
+const fmtPct = (v: number, decimals = 1) => `${v.toFixed(decimals)}%`
 
-  useEffect(() => {
-    cargarObjetivos(year)
-  }, [year])
+const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
 
-  async function cargarObjetivos(selectedYear: number) {
-    try {
-      const res = await fetch(`/api/objetivos?year=${selectedYear}`)
-      const json = await res.json()
-      setData(json)
-    } catch (error) {
-      console.error("Error cargando objetivos:", error)
-      setData(null)
-    }
-  }
+// ─── Data fetching ─────────────────────────────────────────────────────────────
 
-  function formatMoney(value: number) {
-    if (value === null || value === undefined) return ""
-    return new Intl.NumberFormat("es-ES").format(value)
-  }
+async function fetchMetrics(year: number, month: number) {
+  const res = await fetch(`/api/metrics?year=${year}`)
+  const rows: any[] = await res.json()
+  // Find the row for medor 742776, closest month ≤ selected
+  const filtered = rows
+    .filter((r: any) => String(r.mediator_code ?? r.medor_code) === "742776" && Number(r.month) <= month)
+    .sort((a: any, b: any) => Number(b.month) - Number(a.month))
+  return filtered[0] ?? null
+}
 
-  if (!data) {
-    return (
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold">Configuración de objetivos</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Configuración anual de grados AXA y rapeles
-          </p>
-        </div>
+async function fetchProduction(year: number, month: number) {
+  const res = await fetch(`/api/production?year=${year}&month=${month}&medor=742776&medofis=TOTAL`)
+  if (!res.ok) return { nv: [], vida: [] }
+  return res.json()
+}
 
-        <div className="panel text-sm text-slate-500">
-          Cargando objetivos...
-        </div>
+// ─── LOB extractors from production data ──────────────────────────────────────
+
+function getLobGwp(nv: any[], lob: string) {
+  const r = nv.find((r: any) => r.lob?.toUpperCase() === lob && r.ramo === "Total" && !r.subramo)
+  return toN(r?.gwp)
+}
+
+function getSubramoGwp(nv: any[], lob: string, subramo: string) {
+  const r = nv.find((r: any) => r.lob?.toUpperCase() === lob && r.subramo?.toUpperCase() === subramo)
+  return toN(r?.gwp)
+}
+
+function getSubramoGwpnp(nv: any[], lob: string, subramo: string) {
+  const r = nv.find((r: any) => r.lob?.toUpperCase() === lob && r.subramo?.toUpperCase() === subramo)
+  return toN(r?.gwpnp)
+}
+
+function getLobGwpnp(nv: any[], lob: string) {
+  const r = nv.find((r: any) => r.lob?.toUpperCase() === lob && r.ramo === "Total" && !r.subramo)
+  return toN(r?.gwpnp)
+}
+
+function getVidaRiesgoGwpnp(vida: any[]) {
+  return vida
+    .filter((r: any) => r.lob === "Pure Protection")
+    .reduce((s: number, r: any) => s + toN(r.gwpnp), 0)
+}
+
+function getPscGwp(nv: any[], vida: any[]) {
+  const saludCol = getSubramoGwp(nv, "SALUD", "SALUDCOL")
+  const vidaCol  = vida.filter((r: any) => r.negocio === "Colectivo").reduce((s: number, r: any) => s + toN(r.gwp), 0)
+  return saludCol + vidaCol
+}
+
+// ─── Semáforo ─────────────────────────────────────────────────────────────────
+
+function Semaforo({
+  label, value, meta, ok, format = "pct", invertido = false, suffix = "",
+}: {
+  label: string; value: number; meta: string; ok: boolean
+  format?: "pct" | "euros" | "raw"; invertido?: boolean; suffix?: string
+}) {
+  const displayVal = format === "euros" ? fmtE(value) : format === "pct" ? fmtPct(value) : `${value.toFixed(1)}${suffix}`
+  return (
+    <div className={`rounded-2xl border p-4 flex flex-col gap-2 ${
+      ok ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
+    }`}>
+      <div className="flex items-center gap-2">
+        {ok
+          ? <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
+          : <XCircle className="text-red-500 flex-shrink-0" size={18} />
+        }
+        <span className="text-sm font-semibold text-slate-700">{label}</span>
       </div>
-    )
-  }
+      <div className={`text-2xl font-bold ${ok ? "text-emerald-700" : "text-red-700"}`}>
+        {displayVal}
+      </div>
+      <div className="text-xs text-slate-500">Objetivo: {meta}</div>
+    </div>
+  )
+}
 
-  const objetivos = data
+// ─── Bloque Rapel A ────────────────────────────────────────────────────────────
+
+function BloqueRapel({
+  label, gwpActual, gwpAnterior, tabla, condicionesOk,
+}: {
+  label: string; gwpActual: number; gwpAnterior: number
+  tabla: TramoRapel[]; condicionesOk: boolean
+}) {
+  const crecPct = gwpAnterior > 0 ? ((gwpActual - gwpAnterior) / gwpAnterior) * 100 : 0
+  const sinDatoAnterior = gwpAnterior === 0
+  const { tramo, devengo } = condicionesOk && !sinDatoAnterior
+    ? calcDevengoBloqueA(gwpActual, crecPct, tabla)
+    : { tramo: null, devengo: 0 }
+
+  const tramoIdx = tramo ? tabla.indexOf(tramo) : -1
+  const upColor = crecPct > 0 ? "text-emerald-600" : crecPct < 0 ? "text-red-500" : "text-slate-400"
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">Configuración de objetivos</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Configuración anual de grados AXA y rapeles
-        </p>
+    <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+        <span className="font-semibold text-slate-800">{label}</span>
+        {!sinDatoAnterior && (
+          <span className={`text-lg font-bold flex items-center gap-1 ${upColor}`}>
+            {crecPct > 0 ? <TrendingUp size={16}/> : crecPct < 0 ? <TrendingDown size={16}/> : <Minus size={16}/>}
+            {fmtPct(Math.abs(crecPct))}
+          </span>
+        )}
+        {sinDatoAnterior && <span className="text-xs text-slate-400">Sin dato año anterior</span>}
       </div>
 
-      <div className="panel grid gap-4 md:grid-cols-1">
-        <label className="text-sm font-medium text-slate-600">
-          Año
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="px-4 pb-2 flex gap-6 text-sm">
+        <div>
+          <div className="text-xs text-slate-400">GWP ant.</div>
+          <div className="font-medium text-slate-600">{sinDatoAnterior ? "—" : fmtE(gwpAnterior)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-slate-400">GWP actual</div>
+          <div className="font-semibold text-slate-900">{fmtE(gwpActual)}</div>
+        </div>
       </div>
 
-      <Section title="Rapel anual" defaultOpen>
-        <div className="grid gap-4 md:grid-cols-2">
-          <ReadOnlyInput
-            label="Crecimiento mínimo (%)"
-            value={objetivos.rapelAnual?.crecimientoMin}
-          />
-
-          <ReadOnlyInput
-            label="% devueltos máximo (%)"
-            value={objetivos.rapelAnual?.devolucionesMax}
-          />
-
-          <ReadOnlyInput
-            label="Producción Salud (€)"
-            value={formatMoney(objetivos.rapelAnual?.saludMin ?? 0)}
-          />
-
-          <ReadOnlyInput
-            label="Producción Vida (€)"
-            value={formatMoney(objetivos.rapelAnual?.vidaMin ?? 0)}
-          />
+      {/* Tramos */}
+      <div className="px-4 pb-3">
+        <div className="flex gap-1 mt-1">
+          {tabla.map((t, i) => {
+            const isActive = i === tramoIdx
+            const isPast   = i < tramoIdx
+            return (
+              <div
+                key={i}
+                className={`flex-1 rounded-lg px-2 py-1.5 text-center text-xs transition-all ${
+                  isActive
+                    ? "bg-[#003A8F] text-white font-bold shadow"
+                    : isPast
+                    ? "bg-emerald-100 text-emerald-700 font-medium"
+                    : "bg-slate-100 text-slate-400"
+                }`}
+              >
+                <div className="font-semibold">≥{t.min}%</div>
+                <div className={isActive ? "text-blue-200" : ""}>{t.pct}%</div>
+              </div>
+            )
+          })}
         </div>
-      </Section>
+      </div>
 
-      <Section title="Grados AXA" defaultOpen>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Object.entries(objetivos.grados ?? {}).map(([key, value]: any) => (
-            <ReadOnlyInput
-              key={key}
-              label={`Grado ${prettyLabel(key)} (€)`}
-              value={formatMoney(value)}
-            />
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Rapel nueva producción" defaultOpen>
-        <SubSection title="1Q | Enero - Abril">
-          {Object.entries(objetivos.rapelCuatrimestral?.["1"] ?? {}).map(
-            ([key, value]: any) => (
-              <ReadOnlyInput
-                key={key}
-                label={`${prettyLabel(key)} (€)`}
-                value={formatMoney(value)}
-              />
-            )
-          )}
-        </SubSection>
-
-        <SubSection title="2Q | Mayo - Agosto">
-          {Object.entries(objetivos.rapelCuatrimestral?.["2"] ?? {}).map(
-            ([key, value]: any) => (
-              <ReadOnlyInput
-                key={key}
-                label={`${prettyLabel(key)} (€)`}
-                value={formatMoney(value)}
-              />
-            )
-          )}
-        </SubSection>
-
-        <SubSection title="3Q | Septiembre - Diciembre">
-          {Object.entries(objetivos.rapelCuatrimestral?.["3"] ?? {}).map(
-            ([key, value]: any) => (
-              <ReadOnlyInput
-                key={key}
-                label={`${prettyLabel(key)} (€)`}
-                value={formatMoney(value)}
-              />
-            )
-          )}
-        </SubSection>
-      </Section>
-
-      <div className="panel text-sm text-slate-500">
-        Los objetivos se configuran directamente en el código de la aplicación.
+      <div className={`px-4 py-2 border-t flex items-center justify-between ${
+        devengo > 0 ? "border-emerald-100 bg-emerald-50" : "border-slate-100 bg-slate-50"
+      }`}>
+        <span className="text-xs text-slate-500">Devengo estimado (parte A)</span>
+        <span className={`font-bold ${devengo > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+          {devengo > 0 ? fmtE(devengo) : "—"}
+        </span>
       </div>
     </div>
   )
 }
 
-function prettyLabel(value: string) {
-  const labels: Record<string, string> = {
-    salud: "Salud",
-    vida: "Vida",
-    psc: "PSC",
-    empresa: "Empresa",
-    ahorro: "Ahorro",
-    particulares: "Particulares",
+// ─── Barra de progreso cuatrimestral ──────────────────────────────────────────
+
+function ProgressBar({ actual, objetivo, label }: { actual: number; objetivo: number; label: string }) {
+  const pct = objetivo > 0 ? Math.min((actual / objetivo) * 100, 100) : 0
+  const ok  = actual >= objetivo && objetivo > 0
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-600 font-medium">{label}</span>
+        <span className={`font-semibold ${ok ? "text-emerald-600" : "text-slate-700"}`}>
+          {fmtE(actual)} / {fmtE(objetivo)}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${ok ? "bg-emerald-500" : "bg-[#003A8F]"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="text-[10px] text-right text-slate-400">{pct.toFixed(1)}% alcanzado</div>
+    </div>
+  )
+}
+
+// ─── Página principal ──────────────────────────────────────────────────────────
+
+const LABELS: Record<string, string> = {
+  salud: "Salud", psc: "PSC", empresa: "Empresa",
+  particulares: "Particulares", ahorro: "Ahorro", vida: "Vida",
+}
+
+export default function ObjetivosPage() {
+  const [year, setYear]           = useState(2026)
+  const [month, setMonth]         = useState(4)
+  const [metrics, setMetrics]     = useState<any>(null)
+  const [prod, setProd]           = useState<{ nv: any[]; vida: any[] }>({ nv: [], vida: [] })
+  const [prodAnt, setProdAnt]     = useState<{ nv: any[]; vida: any[] }>({ nv: [], vida: [] })
+  const [objetivos, setObjetivos] = useState<any>(null)
+  const [loading, setLoading]     = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      fetchMetrics(year, month),
+      fetchProduction(year, month),
+      fetchProduction(year - 1, month),
+      fetch(`/api/objetivos?year=${year}`).then(r => r.json()),
+    ]).then(([m, p, pa, obj]) => {
+      setMetrics(m)
+      setProd(p)
+      setProdAnt(pa)
+      setObjetivos(obj)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [year, month])
+
+  // ─── Datos base ───────────────────────────────────────────────────────────
+
+  const crecimientoIARD = toN(metrics?.medofis?.crecimientoPct)
+  const cor             = toN(metrics?.medofis?.cor)
+  const pendiente       = toN(metrics?.medofis?.devolucionesPct)
+
+  const saludGwpnp     = getLobGwpnp(prod.nv, "SALUD")
+  const vidaRiesgoGwpnp = getVidaRiesgoGwpnp(prod.vida)
+
+  // GWP por bloque (actual y anterior)
+  const gwpSaludInd    = getSubramoGwp(prod.nv,   "SALUD",          "SALUDIND")
+  const gwpSaludIndAnt = getSubramoGwp(prodAnt.nv, "SALUD",          "SALUDIND")
+  const gwpPart        = getLobGwp(prod.nv,   "PARTICULARES")
+  const gwpPartAnt     = getLobGwp(prodAnt.nv, "PARTICULARES")
+  const gwpEmp         = getLobGwp(prod.nv,   "EMPRESAS")
+  const gwpEmpAnt      = getLobGwp(prodAnt.nv, "EMPRESAS")
+  const gwpPsc         = getPscGwp(prod.nv,   prod.vida)
+  const gwpPscAnt      = getPscGwp(prodAnt.nv, prodAnt.vida)
+
+  // ─── Condiciones de devengo ───────────────────────────────────────────────
+
+  const condOk = useMemo(() => ({
+    crecimiento: crecimientoIARD > CONDICIONES_2026.crecimientoIARDMin,
+    cor:         cor < CONDICIONES_2026.corMax,
+    pendiente:   pendiente < CONDICIONES_2026.pendienteMax,
+    vida:        vidaRiesgoGwpnp >= CONDICIONES_2026.vidaRiesgoMin,
+    salud:       saludGwpnp >= CONDICIONES_2026.saludMin,
+  }), [crecimientoIARD, cor, pendiente, vidaRiesgoGwpnp, saludGwpnp])
+
+  const todasCondiciones = Object.values(condOk).every(Boolean)
+
+  // ─── Devengo total estimado ───────────────────────────────────────────────
+
+  const devengos = useMemo(() => {
+    if (!todasCondiciones) return { saludInd: 0, part: 0, emp: 0, psc: 0, total: 0 }
+    const calc = (gwpA: number, gwpP: number, tabla: TramoRapel[]) => {
+      const crec = gwpP > 0 ? ((gwpA - gwpP) / gwpP) * 100 : 0
+      return calcDevengoBloqueA(gwpA, crec, tabla).devengo
+    }
+    const saludInd = calc(gwpSaludInd, gwpSaludIndAnt, RAPEL_TABLAS_2026.saludInd)
+    const part     = calc(gwpPart,     gwpPartAnt,     RAPEL_TABLAS_2026.particulares)
+    const emp      = calc(gwpEmp,      gwpEmpAnt,      RAPEL_TABLAS_2026.empresas)
+    const psc      = calc(gwpPsc,      gwpPscAnt,      RAPEL_TABLAS_2026.psc)
+    const total    = Math.min(saludInd + part + emp + psc, CONDICIONES_2026.devengMax)
+    return { saludInd, part, emp, psc, total }
+  }, [todasCondiciones, gwpSaludInd, gwpSaludIndAnt, gwpPart, gwpPartAnt, gwpEmp, gwpEmpAnt, gwpPsc, gwpPscAnt])
+
+  // ─── Cuatrimestral — detectar cuatrimestre activo ─────────────────────────
+
+  const q = month <= 4 ? 1 : month <= 8 ? 2 : 3
+  const cuatrimestralObj = objetivos?.rapelCuatrimestral?.[String(q)] ?? {}
+
+  // GWPNP por bloque para cuatrimestral
+  const gwpnpBloque: Record<string, number> = {
+    salud:        getSubramoGwpnp(prod.nv, "SALUD", "SALUDIND"),
+    psc:          getSubramoGwpnp(prod.nv, "SALUD", "SALUDCOL") +
+                    prod.vida.filter((r: any) => r.negocio === "Colectivo").reduce((s: number, r: any) => s + toN(r.gwpnp), 0),
+    empresa:      getLobGwpnp(prod.nv, "EMPRESAS"),
+    particulares: getLobGwpnp(prod.nv, "PARTICULARES"),
+    ahorro:       prod.vida.filter((r: any) => r.negocio === "Individual" && r.lob !== "Pure Protection")
+                    .reduce((s: number, r: any) => s + toN(r.gwpnp ?? r.gwp), 0),
+    vida:         getVidaRiesgoGwpnp(prod.vida),
   }
 
-  return labels[value] ?? value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-function Section({
-  title,
-  children,
-  defaultOpen = false,
-}: {
-  title: string
-  children: React.ReactNode
-  defaultOpen?: boolean
-}) {
-  return (
-    <details
-      open={defaultOpen}
-      className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel"
-    >
-      <summary className="cursor-pointer list-none px-6 py-5">
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-          <span className="text-sm text-slate-400">Abrir / cerrar</span>
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Seguimiento de objetivos</h1>
+          <p className="text-sm text-slate-400 mt-1">Cargando datos…</p>
         </div>
-      </summary>
-
-      <div className="border-t border-slate-100 px-6 py-6 space-y-6">
-        {children}
+        <div className="panel text-center py-12 text-slate-400">Cargando…</div>
       </div>
-    </details>
-  )
-}
+    )
+  }
 
-function SubSection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
   return (
-    <details className="rounded-2xl border border-slate-200 bg-slate-50/60" open>
-      <summary className="cursor-pointer list-none px-4 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <h4 className="font-semibold text-slate-800">{title}</h4>
-          <span className="text-xs text-slate-400">Desplegar</span>
-        </div>
-      </summary>
+    <div className="space-y-8">
 
-      <div className="border-t border-slate-200 px-4 py-4">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {children}
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Seguimiento de objetivos</h1>
+          <p className="text-sm text-slate-400 mt-1">Agencia 742776 · V3M Proyecto Asegurador</p>
+        </div>
+        <div className="flex gap-3">
+          <select value={year} onChange={e => setYear(Number(e.target.value))}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none bg-white">
+            {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select value={month} onChange={e => setMonth(Number(e.target.value))}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none bg-white">
+            {MESES.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+          </select>
         </div>
       </div>
-    </details>
-  )
-}
 
-function ReadOnlyInput({
-  label,
-  value,
-}: {
-  label: string
-  value: string | number
-}) {
-  return (
-    <label className="text-sm font-medium text-slate-600">
-      {label}
-      <input
-        value={value ?? ""}
-        readOnly
-        className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 outline-none"
-      />
-    </label>
+      {/* ── Condiciones de devengo ── */}
+      <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Condiciones de devengo</h2>
+          <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+            todasCondiciones ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+          }`}>
+            {todasCondiciones ? "✓ Todas cumplidas" : "⚠ Condiciones pendientes"}
+          </span>
+        </div>
+        <div className="p-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <Semaforo
+            label="Crecimiento IARD" value={crecimientoIARD}
+            meta="> 0%" ok={condOk.crecimiento} format="pct"
+          />
+          <Semaforo
+            label="CoR (rentabilidad)" value={cor}
+            meta="< 100%" ok={condOk.cor} format="pct" invertido
+          />
+          <Semaforo
+            label="Pendiente cobro" value={pendiente}
+            meta="< 2%" ok={condOk.pendiente} format="pct" invertido
+          />
+          <Semaforo
+            label="Vida Riesgo (GWPNP)" value={vidaRiesgoGwpnp}
+            meta={`≥ ${fmtE(CONDICIONES_2026.vidaRiesgoMin)}`}
+            ok={condOk.vida} format="euros"
+          />
+          <Semaforo
+            label="Salud (GWPNP)" value={saludGwpnp}
+            meta={`≥ ${fmtE(CONDICIONES_2026.saludMin)}`}
+            ok={condOk.salud} format="euros"
+          />
+        </div>
+        {!todasCondiciones && (
+          <div className="mx-6 mb-6 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2 text-sm text-amber-800">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+            Si alguna condición no se cumple al cierre del año, no se devenga ningún bloque del rapel.
+          </div>
+        )}
+      </section>
+
+      {/* ── Rapel A — Crecimiento GWP (70%) ── */}
+      <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-slate-900">Rapel A — Crecimiento GWP</h2>
+          <span className="text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">70% del devengo total</span>
+        </div>
+        <div className="p-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <BloqueRapel label="Salud Individual"  gwpActual={gwpSaludInd} gwpAnterior={gwpSaludIndAnt} tabla={RAPEL_TABLAS_2026.saludInd}    condicionesOk={todasCondiciones} />
+          <BloqueRapel label="Particulares"       gwpActual={gwpPart}    gwpAnterior={gwpPartAnt}    tabla={RAPEL_TABLAS_2026.particulares} condicionesOk={todasCondiciones} />
+          <BloqueRapel label="Empresas"           gwpActual={gwpEmp}     gwpAnterior={gwpEmpAnt}     tabla={RAPEL_TABLAS_2026.empresas}     condicionesOk={todasCondiciones} />
+          <BloqueRapel label="PSC"                gwpActual={gwpPsc}     gwpAnterior={gwpPscAnt}     tabla={RAPEL_TABLAS_2026.psc}          condicionesOk={todasCondiciones} />
+        </div>
+
+        {/* Total estimado A */}
+        <div className="mx-6 mb-6 rounded-2xl border border-[#003A8F]/20 bg-[#003A8F]/5 px-5 py-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-[#003A8F]">Devengo estimado parte A</div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              Parte B (TNP 30%) pendiente de tabla · Máximo conjunto: {fmtE(CONDICIONES_2026.devengMax)}
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-[#003A8F]">
+            {fmtE(devengos.total)}
+          </div>
+        </div>
+
+        <div className="mx-6 mb-6 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 flex gap-2 text-xs text-slate-500">
+          <Info size={14} className="flex-shrink-0 mt-0.5" />
+          El devengo se calcula sobre GWP YTD vs mismo período año anterior. El rapel definitivo se liquida sobre el año completo en Q1 2027.
+        </div>
+      </section>
+
+      {/* ── Rapel B — TNP (30%) ── */}
+      <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-slate-900">Rapel B — Tasa de Nueva Producción</h2>
+          <span className="text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">30% del devengo total</span>
+        </div>
+        <div className="p-6 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 flex gap-2">
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+          La tabla de tramos de TNP está disponible en el contrato en formato imagen y no ha podido extraerse automáticamente.
+          Para activar este módulo, indícame los tramos (TNP% → rapel%) y lo incorporo.
+        </div>
+        <div className="px-6 pb-6 mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {(["PARTICULARES","EMPRESAS","SALUD"] as const).map(lob => {
+            const gwp  = getLobGwp(prod.nv, lob)
+            const gwpa = getLobGwp(prodAnt.nv, lob)
+            const gwpnp = getLobGwpnp(prod.nv, lob)
+            const gwpa1y = getLobGwp(prodAnt.nv, lob) // GWP año anterior = denominador TNP
+            const tnp = gwpa1y > 0 ? (gwpnp / gwpa1y) * 100 : 0
+            return (
+              <div key={lob} className="rounded-xl border border-slate-100 bg-white p-3 text-center">
+                <div className="text-xs text-slate-400 mb-1">{lob === "PARTICULARES" ? "Particulares" : lob === "EMPRESAS" ? "Empresas" : "Salud"}</div>
+                <div className="text-lg font-bold text-slate-900">{fmtPct(tnp)}</div>
+                <div className="text-[10px] text-slate-400">TNP actual</div>
+              </div>
+            )
+          })}
+          <div className="rounded-xl border border-slate-100 bg-white p-3 text-center">
+            <div className="text-xs text-slate-400 mb-1">Vida Riesgo</div>
+            <div className="text-lg font-bold text-slate-900">{fmtE(vidaRiesgoGwpnp)}</div>
+            <div className="text-[10px] text-slate-400">GWPNP</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Rapel cuatrimestral NP ── */}
+      <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel">
+        <div className="px-6 py-5 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Rapel cuatrimestral NP
+            <span className="ml-2 text-sm font-normal text-slate-400">
+              {q === 1 ? "Q1 Enero–Abril" : q === 2 ? "Q2 Mayo–Agosto" : "Q3 Sep–Dic"}
+            </span>
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">Campaña de nueva producción independiente del rapel anual</p>
+        </div>
+        <div className="p-6 space-y-5">
+          {Object.entries(cuatrimestralObj).map(([key, obj]: any) => {
+            const actual = gwpnpBloque[key] ?? 0
+            if (obj === 0 && actual === 0) return null
+            return (
+              <ProgressBar
+                key={key}
+                label={LABELS[key] ?? key}
+                actual={actual}
+                objetivo={obj}
+              />
+            )
+          })}
+          {Object.values(cuatrimestralObj).every(v => v === 0) && (
+            <p className="text-sm text-slate-400 text-center py-4">
+              Objetivos cuatrimestrales para este período pendientes de configurar.
+            </p>
+          )}
+        </div>
+      </section>
+
+    </div>
   )
 }
