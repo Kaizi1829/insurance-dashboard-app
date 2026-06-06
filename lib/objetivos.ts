@@ -25,14 +25,29 @@ export const RAPEL_TABLAS_2026: Record<string, TramoRapel[]> = {
   ],
 }
 
+// Tabla TNP para parte B (extraída del contrato firmado)
+export const RAPEL_TNP_2026: TramoRapel[] = [
+  { min: 15,   max: Infinity, pct: 100 }, // 100% del componente B
+  { min: 12.5, max: 15,       pct: 70  }, // 70% del componente B
+  { min: 0,    max: 12.5,     pct: 0   }, // 0%
+]
+
+// Factor TNP: qué % del componente B se devenga según la TNP de la agencia
+export function factorTNP(tnpPct: number): number {
+  const tramo = [...RAPEL_TNP_2026].reverse().find(t => tnpPct >= t.min)
+  return tramo ? tramo.pct / 100 : 0
+}
+
 // Calcula el devengo de un bloque dado su GWP y % de crecimiento
+// Devuelve: devengo_A (70% component) y el devengo total potencial (para calcular B)
 export function calcDevengoBloqueA(
   gwpActual: number,
   crecPct: number,
   tabla: TramoRapel[]
-): { tramo: TramoRapel | null; devengo: number } {
+): { tramo: TramoRapel | null; devengo: number; devengoPotencial: number } {
   const tramo = tabla.findLast(t => crecPct >= t.min) ?? null
-  return { tramo, devengo: tramo ? gwpActual * (tramo.pct / 100) * 0.70 : 0 }
+  const devengoPotencial = tramo ? gwpActual * (tramo.pct / 100) : 0
+  return { tramo, devengo: devengoPotencial * 0.70, devengoPotencial }
 }
 
 // Condiciones mínimas de devengo 2026

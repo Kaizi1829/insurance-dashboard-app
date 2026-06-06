@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   RAPEL_TABLAS_2026,
+  RAPEL_TNP_2026,
   CONDICIONES_2026,
   calcDevengoBloqueA,
+  factorTNP,
   type TramoRapel,
 } from "@/lib/objetivos"
 import {
@@ -266,21 +268,34 @@ export default function ObjetivosPage() {
 
   const todasCondiciones = Object.values(condOk).every(Boolean)
 
-  // ─── Devengo total estimado ───────────────────────────────────────────────
+  // TNP global de la agencia (de métricas)
+  const tnpAgencia = toN(metrics?.medofis?.tasaNpPct)
+  const tnpFactor  = factorTNP(tnpAgencia)
+
+  // ─── Devengo total estimado (A + B) ──────────────────────────────────────
 
   const devengos = useMemo(() => {
-    if (!todasCondiciones) return { saludInd: 0, part: 0, emp: 0, psc: 0, total: 0 }
+    if (!todasCondiciones) return { saludInd: 0, part: 0, emp: 0, psc: 0, totalA: 0, totalB: 0, total: 0 }
     const calc = (gwpA: number, gwpP: number, tabla: TramoRapel[]) => {
       const crec = gwpP > 0 ? ((gwpA - gwpP) / gwpP) * 100 : 0
-      return calcDevengoBloqueA(gwpA, crec, tabla).devengo
+      return calcDevengoBloqueA(gwpA, crec, tabla)
     }
-    const saludInd = calc(gwpSaludInd, gwpSaludIndAnt, RAPEL_TABLAS_2026.saludInd)
-    const part     = calc(gwpPart,     gwpPartAnt,     RAPEL_TABLAS_2026.particulares)
-    const emp      = calc(gwpEmp,      gwpEmpAnt,      RAPEL_TABLAS_2026.empresas)
-    const psc      = calc(gwpPsc,      gwpPscAnt,      RAPEL_TABLAS_2026.psc)
-    const total    = Math.min(saludInd + part + emp + psc, CONDICIONES_2026.devengMax)
-    return { saludInd, part, emp, psc, total }
-  }, [todasCondiciones, gwpSaludInd, gwpSaludIndAnt, gwpPart, gwpPartAnt, gwpEmp, gwpEmpAnt, gwpPsc, gwpPscAnt])
+    const r1 = calc(gwpSaludInd, gwpSaludIndAnt, RAPEL_TABLAS_2026.saludInd)
+    const r2 = calc(gwpPart,     gwpPartAnt,     RAPEL_TABLAS_2026.particulares)
+    const r3 = calc(gwpEmp,      gwpEmpAnt,      RAPEL_TABLAS_2026.empresas)
+    const r4 = calc(gwpPsc,      gwpPscAnt,      RAPEL_TABLAS_2026.psc)
+
+    const totalA = r1.devengo + r2.devengo + r3.devengo + r4.devengo
+    // B = potencial × 30% × factor TNP
+    const totalPotencial = r1.devengoPotencial + r2.devengoPotencial + r3.devengoPotencial + r4.devengoPotencial
+    const totalB = totalPotencial * 0.30 * tnpFactor
+    const total  = Math.min(totalA + totalB, CONDICIONES_2026.devengMax)
+
+    return {
+      saludInd: r1.devengo, part: r2.devengo, emp: r3.devengo, psc: r4.devengo,
+      totalA, totalB, total,
+    }
+  }, [todasCondiciones, tnpFactor, gwpSaludInd, gwpSaludIndAnt, gwpPart, gwpPartAnt, gwpEmp, gwpEmpAnt, gwpPsc, gwpPscAnt])
 
   // ─── Cuatrimestral — detectar cuatrimestre activo ─────────────────────────
 
@@ -396,7 +411,7 @@ export default function ObjetivosPage() {
             </div>
           </div>
           <div className="text-2xl font-bold text-[#003A8F]">
-            {fmtE(devengos.total)}
+            {fmtE(devengos.totalA)}
           </div>
         </div>
 
@@ -412,32 +427,105 @@ export default function ObjetivosPage() {
           <h2 className="text-lg font-semibold text-slate-900">Rapel B — Tasa de Nueva Producción</h2>
           <span className="text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">30% del devengo total</span>
         </div>
-        <div className="p-6 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 flex gap-2">
-          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-          La tabla de tramos de TNP está disponible en el contrato en formato imagen y no ha podido extraerse automáticamente.
-          Para activar este módulo, indícame los tramos (TNP% → rapel%) y lo incorporo.
-        </div>
-        <div className="px-6 pb-6 mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {(["PARTICULARES","EMPRESAS","SALUD"] as const).map(lob => {
-            const gwp  = getLobGwp(prod.nv, lob)
-            const gwpa = getLobGwp(prodAnt.nv, lob)
-            const gwpnp = getLobGwpnp(prod.nv, lob)
-            const gwpa1y = getLobGwp(prodAnt.nv, lob) // GWP año anterior = denominador TNP
-            const tnp = gwpa1y > 0 ? (gwpnp / gwpa1y) * 100 : 0
-            return (
-              <div key={lob} className="rounded-xl border border-slate-100 bg-white p-3 text-center">
-                <div className="text-xs text-slate-400 mb-1">{lob === "PARTICULARES" ? "Particulares" : lob === "EMPRESAS" ? "Empresas" : "Salud"}</div>
-                <div className="text-lg font-bold text-slate-900">{fmtPct(tnp)}</div>
-                <div className="text-[10px] text-slate-400">TNP actual</div>
+        <div className="p-6 grid gap-6 md:grid-cols-2">
+          {/* TNP actual + tramo */}
+          <div className="space-y-4">
+            <div className={`rounded-2xl border p-5 text-center ${
+              tnpFactor === 1 ? "border-emerald-200 bg-emerald-50"
+              : tnpFactor > 0 ? "border-amber-200 bg-amber-50"
+              : "border-red-200 bg-red-50"
+            }`}>
+              <div className="text-xs text-slate-500 mb-1">TNP global de la agencia</div>
+              <div className={`text-4xl font-bold ${
+                tnpFactor === 1 ? "text-emerald-700" : tnpFactor > 0 ? "text-amber-700" : "text-red-700"
+              }`}>{fmtPct(tnpAgencia)}</div>
+              <div className={`mt-2 text-sm font-semibold ${
+                tnpFactor === 1 ? "text-emerald-600" : tnpFactor > 0 ? "text-amber-600" : "text-red-600"
+              }`}>
+                {tnpFactor === 1 ? "✓ Tramo ≥15% — 100% componente B"
+                 : tnpFactor > 0 ? "◐ Tramo ≥12.5% — 70% componente B"
+                 : "✗ < 12.5% — 0% componente B"}
               </div>
-            )
-          })}
-          <div className="rounded-xl border border-slate-100 bg-white p-3 text-center">
-            <div className="text-xs text-slate-400 mb-1">Vida Riesgo</div>
-            <div className="text-lg font-bold text-slate-900">{fmtE(vidaRiesgoGwpnp)}</div>
-            <div className="text-[10px] text-slate-400">GWPNP</div>
+            </div>
+            <div className="text-xs text-slate-400 bg-slate-50 rounded-xl px-4 py-3 flex gap-2">
+              <Info size={12} className="flex-shrink-0 mt-0.5"/>
+              TNP = GWPNP año actual / GWP año anterior. Se mide sobre el total IARD de la agencia.
+            </div>
+          </div>
+
+          {/* Tabla de tramos */}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Tabla de tramos (contrato 2026)</div>
+            {RAPEL_TNP_2026.map((t, i) => {
+              const isActive = tnpAgencia >= t.min && tnpAgencia < t.max
+              const label = i === 0 ? "≥ 15%" : i === 1 ? "≥ 12,5% y < 15%" : "< 12,5%"
+              return (
+                <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-3 border transition-all ${
+                  isActive
+                    ? "bg-[#003A8F] border-[#003A8F] text-white"
+                    : "border-slate-100 bg-slate-50 text-slate-600"
+                }`}>
+                  <span className={`font-medium ${isActive ? "text-white" : ""}`}>{label}</span>
+                  <span className={`font-bold text-lg ${isActive ? "text-white" : "text-slate-800"}`}>
+                    {t.pct}%
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
+
+        {/* Devengo B estimado */}
+        <div className="mx-6 mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-700">Devengo estimado parte B</div>
+            <div className="text-xs text-slate-400 mt-0.5">Factor TNP: {(tnpFactor * 100).toFixed(0)}%</div>
+          </div>
+          <div className={`text-2xl font-bold ${devengos.totalB > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+            {fmtE(devengos.totalB)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Total estimado rapel ── */}
+      <section className="overflow-hidden rounded-3xl border-2 border-[#003A8F] bg-white shadow-panel">
+        <div className="px-6 py-5 bg-[#003A8F]">
+          <h2 className="text-lg font-semibold text-white">Estimación total rapel {year}</h2>
+          <p className="text-xs text-blue-200 mt-1">
+            Basado en datos YTD hasta {MESES[month - 1]} {year} · Liquidación Q1 {year + 1}
+          </p>
+        </div>
+        <div className="p-6 grid gap-4 sm:grid-cols-3">
+          <div className="text-center rounded-2xl bg-slate-50 border border-slate-100 p-5">
+            <div className="text-xs text-slate-400 mb-1">Parte A (crecimiento GWP)</div>
+            <div className="text-2xl font-bold text-[#003A8F]">{fmtE(devengos.totalA)}</div>
+            <div className="text-xs text-slate-400 mt-1">70% del devengo</div>
+          </div>
+          <div className="text-center rounded-2xl bg-slate-50 border border-slate-100 p-5">
+            <div className="text-xs text-slate-400 mb-1">Parte B (TNP)</div>
+            <div className={`text-2xl font-bold ${devengos.totalB > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+              {fmtE(devengos.totalB)}
+            </div>
+            <div className="text-xs text-slate-400 mt-1">30% del devengo</div>
+          </div>
+          <div className={`text-center rounded-2xl border-2 p-5 ${
+            devengos.total >= CONDICIONES_2026.devengMin
+              ? "bg-emerald-50 border-emerald-300"
+              : "bg-slate-50 border-slate-200"
+          }`}>
+            <div className="text-xs text-slate-500 mb-1">Total estimado</div>
+            <div className={`text-3xl font-bold ${
+              devengos.total >= CONDICIONES_2026.devengMin ? "text-emerald-700" : "text-slate-400"
+            }`}>{fmtE(devengos.total)}</div>
+            <div className="text-xs text-slate-400 mt-1">Mín. {fmtE(CONDICIONES_2026.devengMin)} · Máx. {fmtE(CONDICIONES_2026.devengMax)}</div>
+          </div>
+        </div>
+        {!todasCondiciones && (
+          <div className="mx-6 mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex gap-2">
+            <XCircle size={16} className="flex-shrink-0 mt-0.5"/>
+            No se devenga rapel si alguna condición de la sección superior no se cumple al cierre del año.
+          </div>
+        )}
       </section>
 
       {/* ── Rapel cuatrimestral NP ── */}
