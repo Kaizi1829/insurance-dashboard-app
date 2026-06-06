@@ -66,51 +66,86 @@ function PieLabel({ cx, cy, midAngle, outerRadius, percent }: any) {
 
 // ─── Production data helpers ──────────────────────────────────────────────────
 
-type NVRow   = { lob: string; ramo: string; subramo: string | null; gwpnp: any; gwpnpa: any }
+type NVRow   = { lob: string; ramo: string; subramo: string | null; gwp: any; gwpnp: any; gwpnpa: any; np: any; np_ant: any; net_inflow: any }
 type VRow    = { lob: string; negocio: string; gwpnp: any; gwpnpa: any; gwp: any; gwpa: any }
 type ProdVal = { actual: number; anterior: number }
-type ProdRow = { name: string; actual: number; anterior: number; color: string; isHighlighted: boolean }
+type ProdExtra = { np: number; np_ant: number; netInflow: number; tasaNp: number; primMedia: number }
+type ProdRow = { name: string; actual: number; anterior: number; color: string; isHighlighted: boolean } & ProdExtra
 
 function titleCase(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
-// Sum all subramo rows for a given lob + ramo (no 'Total' subramo exists in this schema)
-function nvRamo(rows: NVRow[], lob: string, ramo: string): ProdVal {
+// Aggregate all subramo rows for a given lob + ramo
+function nvRamoAgg(rows: NVRow[], lob: string, ramo: string): ProdVal & ProdExtra {
   const match = rows.filter(r =>
     r.lob?.toUpperCase() === lob.toUpperCase() &&
     r.ramo?.toUpperCase() === ramo.toUpperCase()
   )
+  const gwpnp   = match.reduce((s, r) => s + toNumber(r.gwpnp), 0)
+  const gwpnpa  = match.reduce((s, r) => s + toNumber(r.gwpnpa), 0)
+  const gwp     = match.reduce((s, r) => s + toNumber(r.gwp), 0)
+  const np      = match.reduce((s, r) => s + toNumber(r.np), 0)
+  const np_ant  = match.reduce((s, r) => s + toNumber(r.np_ant), 0)
+  const netInf  = match.reduce((s, r) => s + toNumber(r.net_inflow), 0)
   return {
-    actual:   match.reduce((s, r) => s + toNumber(r.gwpnp), 0),
-    anterior: match.reduce((s, r) => s + toNumber(r.gwpnpa), 0),
+    actual: gwpnp, anterior: gwpnpa,
+    np, np_ant, netInflow: netInf,
+    tasaNp:   gwp > 0 ? (gwpnp / gwp) * 100 : 0,
+    primMedia: np > 0 ? gwpnp / np : 0,
   }
 }
 
 // Specific subramo row
-function nvSubramo(rows: NVRow[], lob: string, subramo: string): ProdVal {
+function nvSubramoAgg(rows: NVRow[], lob: string, subramo: string): ProdVal & ProdExtra {
   const r = rows.find(r =>
     r.lob?.toUpperCase() === lob.toUpperCase() &&
     r.subramo?.toUpperCase() === subramo.toUpperCase()
   )
-  return { actual: toNumber(r?.gwpnp), anterior: toNumber(r?.gwpnpa) }
+  const gwpnp  = toNumber(r?.gwpnp)
+  const gwp    = toNumber(r?.gwp)
+  const np     = toNumber(r?.np)
+  return {
+    actual: gwpnp, anterior: toNumber(r?.gwpnpa),
+    np, np_ant: toNumber(r?.np_ant), netInflow: toNumber(r?.net_inflow),
+    tasaNp:   gwp > 0 ? (gwpnp / gwp) * 100 : 0,
+    primMedia: np > 0 ? gwpnp / np : 0,
+  }
 }
 
 // LOB total row (ramo='Total', subramo=null)
-function nvLob(rows: NVRow[], lob: string): ProdVal {
+function nvLobAgg(rows: NVRow[], lob: string): ProdVal & ProdExtra {
   const r = rows.find(r =>
     r.lob?.toUpperCase() === lob.toUpperCase() &&
     r.ramo === "Total" && !r.subramo
   )
-  if (r) return { actual: toNumber(r.gwpnp), anterior: toNumber(r.gwpnpa) }
-  // Fallback: sum all ramo-level rows
+  if (r) {
+    const gwpnp = toNumber(r.gwpnp)
+    const gwp   = toNumber(r.gwp)
+    const np    = toNumber(r.np)
+    return {
+      actual: gwpnp, anterior: toNumber(r.gwpnpa),
+      np, np_ant: toNumber(r.np_ant), netInflow: toNumber(r.net_inflow),
+      tasaNp:   gwp > 0 ? (gwpnp / gwp) * 100 : 0,
+      primMedia: np > 0 ? gwpnp / np : 0,
+    }
+  }
+  // Fallback: aggregate from ramo rows
   const uniqRamos = [...new Set(
     rows.filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total").map(r => r.ramo)
   )]
-  return uniqRamos.reduce((acc, ramo) => {
-    const v = nvRamo(rows, lob, ramo)
-    return { actual: acc.actual + v.actual, anterior: acc.anterior + v.anterior }
-  }, { actual: 0, anterior: 0 } as ProdVal)
+  const agg = uniqRamos.reduce((acc, ramo) => {
+    const v = nvRamoAgg(rows, lob, ramo)
+    return { ...acc, actual: acc.actual + v.actual, anterior: acc.anterior + v.anterior,
+      np: acc.np + v.np, np_ant: acc.np_ant + v.np_ant, netInflow: acc.netInflow + v.netInflow }
+  }, { actual: 0, anterior: 0, np: 0, np_ant: 0, netInflow: 0 } as ProdVal & ProdExtra)
+  const gwpAll = rows.filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total")
+    .reduce((s, r) => s + toNumber(r.gwp), 0)
+  return {
+    ...agg,
+    tasaNp:   gwpAll > 0 ? (agg.actual / gwpAll) * 100 : 0,
+    primMedia: agg.np > 0 ? agg.actual / agg.np : 0,
+  }
 }
 
 // Get all unique ramo names for a LOB (excluding 'Total')
@@ -127,27 +162,30 @@ function buildLobRows(rows: NVRow[], lob: string, color: string): ProdRow[] {
   const ramos = nvRamos(rows, lob)
   const dataRows: ProdRow[] = ramos.map(ramo => ({
     name: titleCase(ramo),
-    ...nvRamo(rows, lob, ramo),
+    ...nvRamoAgg(rows, lob, ramo),
     color,
     isHighlighted: false,
   }))
   dataRows.push({
     name: `Total ${titleCase(lob)}`,
-    ...nvLob(rows, lob),
+    ...nvLobAgg(rows, lob),
     color,
     isHighlighted: true,
   })
   return dataRows
 }
 
+const NO_EXTRA: ProdExtra = { np: 0, np_ant: 0, netInflow: 0, tasaNp: 0, primMedia: 0 }
+
 // Vida / Ahorro by product (lob) and optionally by negocio (Individual / Colectivo)
-function vidaByLob(rows: VRow[], lob: string, negocio?: string): ProdVal {
+function vidaByLob(rows: VRow[], lob: string, negocio?: string): ProdVal & ProdExtra {
   const match = rows.filter(r =>
     r.lob === lob && (!negocio || r.negocio === negocio)
   )
   return {
     actual:   match.reduce((s, r) => s + toNumber(r.gwpnp ?? r.gwp), 0),
     anterior: match.reduce((s, r) => s + toNumber(r.gwpnpa ?? r.gwpa), 0),
+    ...NO_EXTRA,
   }
 }
 
@@ -241,9 +279,9 @@ export default function HomePage() {
 
     // Salud: always show Individual + Colectivo even if value=0
     const saludRows: ProdRow[] = [
-      { name: "Individual", ...nvSubramo(nv, "SALUD", "SALUDIND"), color: COLORS[4], isHighlighted: false },
-      { name: "Colectivo",  ...nvSubramo(nv, "SALUD", "SALUDCOL"), color: COLORS[4], isHighlighted: false },
-      { name: "Total Salud", ...nvLob(nv, "SALUD"),                 color: COLORS[4], isHighlighted: true  },
+      { name: "Individual", ...nvSubramoAgg(nv, "SALUD", "SALUDIND"), color: COLORS[4], isHighlighted: false },
+      { name: "Colectivo",  ...nvSubramoAgg(nv, "SALUD", "SALUDCOL"), color: COLORS[4], isHighlighted: false },
+      { name: "Total Salud", ...nvLobAgg(nv, "SALUD"),                 color: COLORS[4], isHighlighted: true  },
     ]
 
     // Vida (Pure Protection): Individual + Colectivo — always show
@@ -616,44 +654,69 @@ function VarBadge({ actual, anterior }: { actual: number; anterior: number }) {
 
 function ProductionTable({ title, data }: {
   title: string
-  data: Array<{ name: string; actual: number; anterior: number; color: string; isHighlighted?: boolean }>
+  data: ProdRow[]
 }) {
   const accentColor = data[0]?.color ?? "#003A8F"
   return (
     <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
       <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
       <div className="p-3">
-      <h4 className="font-semibold text-sm text-slate-800 mb-2 flex items-center gap-2">
-        <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
-        {title}
-      </h4>
-      <div className="grid grid-cols-[2fr_1fr_1fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
-        <span>Ramo</span>
-        <span className="text-right">Año ant.</span>
-        <span className="text-right">Actual</span>
-        <span className="text-right">Var. %</span>
-      </div>
-      <div className="space-y-0.5">
-        {data.map((item, i) => (
-          <div key={i} className={`grid grid-cols-[2fr_1fr_1fr_1fr] items-center px-2 py-1.5 rounded-lg transition-colors ${
-            item.isHighlighted
-              ? "bg-slate-50 border border-slate-200"
-              : "border border-transparent hover:bg-slate-50"
-          }`}>
-            <span
-              className={`text-sm truncate ${item.isHighlighted ? "font-bold" : "font-medium text-slate-700"}`}
-              style={{ color: item.isHighlighted ? item.color : undefined }}
-            >
-              {item.name}
-            </span>
-            <span className="text-right text-xs text-slate-400">{fmtEuros(item.anterior)}</span>
-            <span className={`text-right text-sm font-semibold ${item.isHighlighted ? "text-slate-900" : "text-slate-800"}`}>
-              {fmtEuros(item.actual)}
-            </span>
-            <VarBadge actual={item.actual} anterior={item.anterior} />
-          </div>
-        ))}
-      </div>
+        <h4 className="font-semibold text-sm text-slate-800 mb-2 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
+          {title}
+        </h4>
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
+          <span>Ramo</span>
+          <span className="text-right">Año ant.</span>
+          <span className="text-right">Actual</span>
+          <span className="text-right">Var. %</span>
+        </div>
+        <div className="space-y-1">
+          {data.map((item, i) => (
+            <div key={i} className={`rounded-lg border transition-colors ${
+              item.isHighlighted ? "bg-slate-50 border-slate-200" : "border-transparent hover:bg-slate-50"
+            }`}>
+              {/* Main row */}
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr] items-center px-2 py-1.5">
+                <span
+                  className={`text-sm truncate ${item.isHighlighted ? "font-bold" : "font-medium text-slate-700"}`}
+                  style={{ color: item.isHighlighted ? item.color : undefined }}
+                >
+                  {item.name}
+                </span>
+                <span className="text-right text-xs text-slate-400">{fmtEuros(item.anterior)}</span>
+                <span className={`text-right text-sm font-semibold ${item.isHighlighted ? "text-slate-900" : "text-slate-800"}`}>
+                  {fmtEuros(item.actual)}
+                </span>
+                <VarBadge actual={item.actual} anterior={item.anterior} />
+              </div>
+              {/* Sub-row: pólizas, TNP%, prima media, neto */}
+              {(item.np > 0 || item.tasaNp > 0) && (
+                <div className="grid grid-cols-4 gap-x-2 px-2 pb-1.5 text-[10px] text-slate-400">
+                  <span>
+                    <span className="font-semibold text-slate-600">{Math.round(item.np)}</span> pól.
+                    {item.np_ant > 0 && (
+                      <span className={`ml-1 ${item.np >= item.np_ant ? "text-emerald-500" : "text-red-400"}`}>
+                        ({item.np >= item.np_ant ? "▲" : "▼"}{Math.abs(item.np - item.np_ant).toFixed(0)})
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-right">
+                    TNP <span className="font-semibold text-slate-600">{item.tasaNp.toFixed(1)}%</span>
+                  </span>
+                  <span className="text-right">
+                    PM <span className="font-semibold text-slate-600">{item.primMedia > 0 ? fmtEuros(item.primMedia) : "—"}</span>
+                  </span>
+                  <span className="text-right">
+                    Neto <span className={`font-semibold ${item.netInflow >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      {item.netInflow >= 0 ? "+" : ""}{Math.round(item.netInflow)}
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

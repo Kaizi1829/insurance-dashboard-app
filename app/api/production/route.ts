@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         month:         `eq.${month}`,
         medor_code:    `eq.${medor}`,
         medofis_code:  `eq.${medofis}`,
-        select:        'lob,ramo,subramo,gwpnp,gwpnpa',
+        select:        'lob,ramo,subramo,gwp,gwpnp,gwpnpa,np,np_ant,net_inflow',
         order:         'lob,ramo,subramo',
       }),
       supaFetch('argos_vida', {
