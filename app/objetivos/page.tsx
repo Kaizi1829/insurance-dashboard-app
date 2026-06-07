@@ -28,8 +28,9 @@ const LOB_LABELS: Record<string, string> = {
 async function fetchMetrics(year: number, month: number) {
   const res = await fetch(`/api/metrics?year=${year}`)
   const rows: any[] = await res.json()
+  // La API devuelve mediatorCode (camelCase), no mediator_code
   return rows
-    .filter((r: any) => String(r.mediator_code ?? r.medor_code) === "742776" && Number(r.month) <= month)
+    .filter((r: any) => String(r.mediatorCode ?? r.mediator_code ?? r.medor_code) === "742776" && Number(r.month) <= month)
     .sort((a: any, b: any) => Number(b.month) - Number(a.month))[0] ?? null
 }
 async function fetchProduction(year: number, month: number) {
