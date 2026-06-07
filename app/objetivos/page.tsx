@@ -25,14 +25,6 @@ const LOB_LABELS: Record<string, string> = {
 }
 
 // ─── Fetch ─────────────────────────────────────────────────────────────────────
-async function fetchMetrics(year: number, month: number) {
-  const res = await fetch(`/api/metrics?year=${year}`)
-  const rows: any[] = await res.json()
-  // La API devuelve mediatorCode (camelCase), no mediator_code
-  return rows
-    .filter((r: any) => String(r.mediatorCode ?? r.mediator_code ?? r.medor_code) === "742776" && Number(r.month) <= month)
-    .sort((a: any, b: any) => Number(b.month) - Number(a.month))[0] ?? null
-}
 async function fetchProduction(year: number, month: number) {
   const res = await fetch(`/api/production?year=${year}&month=${month}&medor=742776&medofis=TOTAL`)
   if (!res.ok) return { nv: [], vida: [] }
@@ -163,7 +155,6 @@ function ProgressBar({ label, actual, objetivo }: { label: string; actual: numbe
 export default function ObjetivosPage() {
   const [year,  setYear]  = useState(2026)
   const [month, setMonth] = useState(4)
-  const [metrics,   setMetrics]   = useState<any>(null)
   const [prod,      setProd]      = useState<{ nv: any[]; vida: any[] }>({ nv: [], vida: [] })
   const [prodAnt,   setProdAnt]   = useState<{ nv: any[]; vida: any[] }>({ nv: [], vida: [] })
   const [objetivos, setObjetivos] = useState<any>(null)
@@ -172,24 +163,21 @@ export default function ObjetivosPage() {
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      fetchMetrics(year, month),
       fetchProduction(year, month),
       fetchProduction(year - 1, month),
       fetch(`/api/objetivos?year=${year}`).then(r => r.json()),
-    ]).then(([m, p, pa, obj]) => {
-      setMetrics(m); setProd(p); setProdAnt(pa); setObjetivos(obj)
+    ]).then(([p, pa, obj]) => {
+      setProd(p); setProdAnt(pa); setObjetivos(obj)
     }).finally(() => setLoading(false))
   }, [year, month])
 
-  // ── Crecimiento IARD desde argos (GWP total no-vida) ──────────────────────
-  const totalIARDAct = prod.nv.filter(r => r.ramo === "Total" && !r.subramo).reduce((s, r) => s + toN(r.gwp), 0)
-  const totalIARDAnt = prodAnt.nv.filter(r => r.ramo === "Total" && !r.subramo).reduce((s, r) => s + toN(r.gwp), 0)
-  const crecIARD     = crec(totalIARDAct, totalIARDAnt)
-
-  // ── Métricas de calidad (de la API de métricas) ───────────────────────────
-  const cor       = toN(metrics?.medofis?.cor)
-  const pendiente = toN(metrics?.medofis?.devolucionesPct)   // %PTE P.Adq
-  const tnp       = toN(metrics?.medofis?.tasaNpPct)          // TNP global agencia
+  // ── Fila Total IARD de argos (lob='Total', ramo=null, subramo=null) ───────
+  // Contiene crecimiento GWP, TNP y pendiente adquirido del total de la agencia
+  const totalRow  = prod.nv.find((r: any) => r.lob === "Total" && !r.ramo && !r.subramo)
+  const crecIARD  = toN(totalRow?.gwp_pct) * 100         // decimal → %  (ej: 0.03985 → 3.99%)
+  const tnp       = toN(totalRow?.tasa_np_pct) * 100     // decimal → %  (ej: 0.11088 → 11.09%)
+  const pendiente = toN(totalRow?.pte_p_adq_pct) * 100   // decimal → %  pendiente adquirido
+  const cor       = toN(totalRow?.cor)                   // CoR (0 si no disponible)
 
   // ── GWPNP mínimos (condiciones del contrato) ──────────────────────────────
   const saludNP    = lobGwpnp(prod.nv, "SALUD")
