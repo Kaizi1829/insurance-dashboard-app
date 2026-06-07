@@ -203,7 +203,16 @@ export default function ObjetivosPage() {
 
   // ─── Métricas base ────────────────────────────────────────────────────────
 
-  const crecimientoIARD  = toN(metrics?.medofis?.crecimientoPct)
+  // Crecimiento IARD: calculado desde argos (suma GWP LOB totales no-vida)
+  const totalIARDGwp    = prod.nv
+    .filter((r: any) => r.ramo === "Total" && !r.subramo)
+    .reduce((s: number, r: any) => s + toN(r.gwp), 0)
+  const totalIARDGwpAnt = prodAnt.nv
+    .filter((r: any) => r.ramo === "Total" && !r.subramo)
+    .reduce((s: number, r: any) => s + toN(r.gwp), 0)
+  const crecimientoIARD = totalIARDGwpAnt > 0
+    ? ((totalIARDGwp - totalIARDGwpAnt) / totalIARDGwpAnt) * 100
+    : 0
   const cor              = toN(metrics?.medofis?.cor)
   const pendiente        = toN(metrics?.medofis?.devolucionesPct)
   const saludGwpnp       = getLobGwpnp(prod.nv, "SALUD")
@@ -269,7 +278,7 @@ export default function ObjetivosPage() {
 
   if (loading) return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-slate-900">Seguimiento de objetivos</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Objetivos</h1>
       <div className="panel text-center py-12 text-slate-400">Cargando…</div>
     </div>
   )
@@ -280,7 +289,7 @@ export default function ObjetivosPage() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Seguimiento de objetivos</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Objetivos</h1>
           <p className="text-sm text-slate-400 mt-1">Agencia 742776 · V3M Proyecto Asegurador · datos YTD hasta {MESES[month - 1]} {year}</p>
         </div>
         <div className="flex gap-3">
