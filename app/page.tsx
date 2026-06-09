@@ -333,16 +333,15 @@ export default function HomePage() {
     [globalYear]
   )
 
-  // ── Cartera pie data ──
+  // ── Cartera pie data (GWP por LOB desde produccion) ──
   const carteraData = useMemo(() => {
     if (!data) return []
     return [
-      { name: "Particulares", value: toNumber(data?.cartera?.particulares?.total) },
-      { name: "Empresa",      value: toNumber(data?.cartera?.empresa?.total) },
-      { name: "Salud",        value: toNumber(data?.cartera?.salud?.total) },
-      { name: "Vida",         value: toNumber(data?.cartera?.vida?.individual) },
-      { name: "Ahorro",       value: toNumber(data?.cartera?.vida?.ahorro) },
-      { name: "PSC",          value: toNumber(data?.cartera?.psc?.total) },
+      { name: "Particulares", value: toNumber(data?.produccion?.particulares) },
+      { name: "Empresa",      value: toNumber(data?.produccion?.empresas) },
+      { name: "Salud",        value: toNumber(data?.produccion?.salud) },
+      { name: "Vida",         value: toNumber(data?.produccion?.vida?.individual) },
+      { name: "Ahorro",       value: toNumber(data?.produccion?.vida?.ahorro) },
     ].filter(d => d.value > 0)
   }, [data])
 
@@ -394,8 +393,10 @@ export default function HomePage() {
   const prevCrecimiento  = previousData ? toNumber(previousData?.medofis?.crecimientoPct) : null
   const prevCor          = previousData ? toNumber(previousData?.medofis?.cor) : null
 
-  const prodSalud = toNumber(data?.produccion?.salud?.total)
-  const prodVida  = toNumber(data?.produccion?.vida?.individual)
+  // produccion.salud y produccion.vida son números directos (GWP total del LOB)
+  // produccion.vida.individual viene de argos_vida (Pure Protection Individual)
+  const prodSalud = toNumber(data?.produccion?.salud)
+  const prodVida  = toNumber(data?.produccion?.vida?.individual ?? data?.produccion?.vida)
 
   return (
     <div className="space-y-8">
