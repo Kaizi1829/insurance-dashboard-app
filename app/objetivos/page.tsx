@@ -311,15 +311,15 @@ export default function ObjetivosPage() {
     const r2 = calcDevengoBloqueA(gwpPart,     crecPart,     RAPEL_TABLAS_2026.particulares)
     const r3 = calcDevengoBloqueA(gwpEmp,      crecEmp,      RAPEL_TABLAS_2026.empresas)
     const r4 = calcDevengoBloqueA(gwpPsc,      crecPsc,      RAPEL_TABLAS_2026.psc)
-    const crecTotal  = todasOk ? r1.devengo + r2.devengo + r3.devengo + r4.devengo : 0
-    const potencial  = r1.devengoPotencial + r2.devengoPotencial + r3.devengoPotencial + r4.devengoPotencial
-    const nuevaProd  = todasOk ? potencial * 0.30 * tnpFact : 0
+    const crecTotal = r1.devengo + r2.devengo + r3.devengo + r4.devengo
+    const potencial = r1.devengoPotencial + r2.devengoPotencial + r3.devengoPotencial + r4.devengoPotencial
+    const nuevaProd = potencial * 0.30 * tnpFact
     return {
       crecimiento: crecTotal,
       nuevaProd,
       total: Math.min(crecTotal + nuevaProd, CONDICIONES_2026.devengMax),
     }
-  }, [todasOk, tnpFact, gwpSaludInd, crecSaludInd, gwpPart, crecPart, gwpEmp, crecEmp, gwpPsc, crecPsc])
+  }, [tnpFact, gwpSaludInd, crecSaludInd, gwpPart, crecPart, gwpEmp, crecEmp, gwpPsc, crecPsc])
 
   // ── GWPNP cuatrimestral ───────────────────────────────────────────────────
   const q = effectiveMonth <= 4 ? 1 : effectiveMonth <= 8 ? 2 : 3
@@ -444,10 +444,10 @@ export default function ObjetivosPage() {
             <span className="ml-2 text-xs font-normal text-slate-400">GWP actual vs anterior · tramos del contrato</span>
           </h3>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <BloqueGwp label="Salud Individual" gwpAct={gwpSaludInd} gwpAnt={gwpSaludIndAnt} crecPct={crecSaludInd} tabla={RAPEL_TABLAS_2026.saludInd}    condOk={todasOk} />
-            <BloqueGwp label="Particulares"     gwpAct={gwpPart}    gwpAnt={gwpPartAnt}     crecPct={crecPart}     tabla={RAPEL_TABLAS_2026.particulares} condOk={todasOk} />
-            <BloqueGwp label="Empresas"         gwpAct={gwpEmp}     gwpAnt={gwpEmpAnt}      crecPct={crecEmp}      tabla={RAPEL_TABLAS_2026.empresas}     condOk={todasOk} />
-            <BloqueGwp label="PSC"              gwpAct={gwpPsc}     gwpAnt={gwpPscAnt}      crecPct={crecPsc}      tabla={RAPEL_TABLAS_2026.psc}          condOk={todasOk} />
+            <BloqueGwp label="Salud Individual" gwpAct={gwpSaludInd} gwpAnt={gwpSaludIndAnt} crecPct={crecSaludInd} tabla={RAPEL_TABLAS_2026.saludInd}    condOk={true} />
+            <BloqueGwp label="Particulares"     gwpAct={gwpPart}    gwpAnt={gwpPartAnt}     crecPct={crecPart}     tabla={RAPEL_TABLAS_2026.particulares} condOk={true} />
+            <BloqueGwp label="Empresas"         gwpAct={gwpEmp}     gwpAnt={gwpEmpAnt}      crecPct={crecEmp}      tabla={RAPEL_TABLAS_2026.empresas}     condOk={true} />
+            <BloqueGwp label="PSC"              gwpAct={gwpPsc}     gwpAnt={gwpPscAnt}      crecPct={crecPsc}      tabla={RAPEL_TABLAS_2026.psc}          condOk={true} />
           </div>
         </div>
       </Section>
