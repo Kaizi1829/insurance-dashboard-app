@@ -66,7 +66,7 @@ export const CONDICIONES_2026 = {
 export const objetivosPorAno: Record<number, any> = {
   2025: {
     year: 2025,
-    grados: { salud: 0, empresa: 0, vida: 0, psc: 0, ahorro: 0 },
+    grados: { salud: 0, empresa: 0, psc: 0, vidaRiesgoInd: 0, ahorro: 0 },
     rapelAnual: { crecimientoMin: 0, devolucionesMax: 0, saludMin: 0, vidaMin: 0 },
     rapelCuatrimestral: {
       "1": { salud: 0, psc: 0, empresa: 0, particulares: 0, ahorro: 0, vida: 0 },
@@ -77,7 +77,7 @@ export const objetivosPorAno: Record<number, any> = {
 
   2026: {
     year: 2026,
-    grados: { salud: 20000, empresa: 40000, vida: 12000, psc: 12000, ahorro: 100000 },
+    grados: { salud: 20000, empresa: 40000, psc: 12000, vidaRiesgoInd: 10000, ahorro: 120000 },
     rapelAnual: {
       crecimientoMin: 0,
       devolucionesMax: 2,
@@ -94,7 +94,7 @@ export const objetivosPorAno: Record<number, any> = {
 
   2027: {
     year: 2027,
-    grados: { salud: 0, empresa: 0, vida: 0, psc: 0, ahorro: 0 },
+    grados: { salud: 0, empresa: 0, psc: 0, vidaRiesgoInd: 0, ahorro: 0 },
     rapelAnual: { crecimientoMin: 0, devolucionesMax: 0, saludMin: 0, vidaMin: 0 },
     rapelCuatrimestral: {
       "1": { salud: 0, psc: 0, empresa: 0, particulares: 0, ahorro: 0, vida: 0 },
@@ -108,7 +108,7 @@ export function getObjetivosByYear(year: number) {
   return (
     objetivosPorAno[year] ?? {
       year,
-      grados: { salud: 0, empresa: 0, vida: 0, psc: 0, ahorro: 0 },
+      grados: { salud: 0, empresa: 0, psc: 0, vidaRiesgoInd: 0, ahorro: 0 },
       rapelAnual: { crecimientoMin: 0, devolucionesMax: 0, saludMin: 0, vidaMin: 0 },
       rapelCuatrimestral: {
         "1": { salud: 0, psc: 0, empresa: 0, particulares: 0, ahorro: 0, vida: 0 },
