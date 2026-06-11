@@ -182,20 +182,20 @@ function GradoCard({ titulo, items, icon: Icon }: {
 
   return (
     <div className={`rounded-2xl overflow-hidden border-2 transition-all ${
-      allOk ? "border-amber-400 bg-amber-50" : "border-slate-100 bg-white"
+      allOk ? "border-emerald-500 bg-emerald-50" : "border-slate-100 bg-white"
     }`}>
       {/* Header */}
       <div className={`px-5 py-4 flex items-center justify-between gap-3 ${
-        allOk ? "bg-amber-400" : "bg-slate-50 border-b border-slate-100"
+        allOk ? "bg-emerald-500" : "bg-slate-50 border-b border-slate-100"
       }`}>
         <div className="flex items-center gap-3">
-          <IconComp size={20} className={allOk ? "text-amber-900" : "text-slate-400"} />
-          <span className={`font-semibold text-sm ${allOk ? "text-amber-900" : "text-slate-700"}`}>
+          <IconComp size={20} className={allOk ? "text-white" : "text-slate-400"} />
+          <span className={`font-semibold text-sm ${allOk ? "text-white" : "text-slate-700"}`}>
             {titulo}
           </span>
         </div>
         {allOk
-          ? <span className="text-xs font-bold bg-white text-amber-700 px-2.5 py-1 rounded-full">✓ Conseguido</span>
+          ? <span className="text-xs font-bold bg-white text-emerald-700 px-2.5 py-1 rounded-full">✓ Conseguido</span>
           : anyProgress
             ? <span className="text-xs font-medium bg-white text-slate-500 px-2.5 py-1 rounded-full border border-slate-200">En curso</span>
             : <span className="text-xs text-slate-400">Sin datos</span>
@@ -335,15 +335,16 @@ export default function ObjetivosPage() {
     vida:         vidaRiesgoNP(prod.vida),
   }
 
-  // ── Grados ────────────────────────────────────────────────────────────────
+  // ── Grados (GWPNP) ───────────────────────────────────────────────────────
   const grados = objetivos?.grados ?? {}
-  const gwpEmpresaTotal = lobGwp(prod.nv, "EMPRESAS")
-  const gwpSaludIndTotal = subGwp(prod.nv, "SALUD", "SALUDIND")
-  const gwpPscTotal = pscGwp(prod.nv, prod.vida)
-  const gwpVidaInd = prod.vida.filter(r => r.lob === "Pure Protection" && r.negocio === "Individual")
-    .reduce((s, r) => s + toN(r.gwp ?? r.gwpnp), 0)
-  const gwpAhorro = prod.vida.filter(r => ["General Account", "Unit Linked", "Protection w/s"].includes(r.lob))
-    .reduce((s, r) => s + toN(r.gwp ?? r.gwpnp), 0)
+  const gwpnpEmpresa  = lobGwpnp(prod.nv, "EMPRESAS")
+  const gwpnpSaludInd = subGwpnp(prod.nv, "SALUD", "SALUDIND")
+  const gwpnpPsc      = subGwpnp(prod.nv, "SALUD", "SALUDCOL") +
+    prod.vida.filter(r => r.negocio === "Colectivo").reduce((s, r) => s + toN(r.gwpnp), 0)
+  const gwpnpVidaInd  = prod.vida.filter(r => r.lob === "Pure Protection" && r.negocio === "Individual")
+    .reduce((s, r) => s + toN(r.gwpnp), 0)
+  const gwpnpAhorro   = prod.vida.filter(r => ["General Account", "Unit Linked", "Protection w/s"].includes(r.lob))
+    .reduce((s, r) => s + toN(r.gwpnp ?? r.gwp), 0)
 
   if (loading) return (
     <div className="space-y-4">
@@ -535,24 +536,24 @@ export default function ObjetivosPage() {
           <GradoCard
             titulo="Grado Empresa"
             icon={Trophy}
-            items={[{ label: "GWP Empresas", actual: gwpEmpresaTotal, objetivo: grados.empresa ?? 40000 }]}
+            items={[{ label: "GWPNP Empresas", actual: gwpnpEmpresa, objetivo: grados.empresa ?? 40000 }]}
           />
           <GradoCard
             titulo="Grado Salud"
             icon={Award}
-            items={[{ label: "GWP Salud Individual", actual: gwpSaludIndTotal, objetivo: grados.salud ?? 20000 }]}
+            items={[{ label: "GWPNP Salud Individual", actual: gwpnpSaludInd, objetivo: grados.salud ?? 20000 }]}
           />
           <GradoCard
             titulo="Grado PSC"
             icon={Award}
-            items={[{ label: "GWP Vida Colectivo + Salud Colectivo", actual: gwpPscTotal, objetivo: grados.psc ?? 12000 }]}
+            items={[{ label: "GWPNP Vida Col. + Salud Col.", actual: gwpnpPsc, objetivo: grados.psc ?? 12000 }]}
           />
           <GradoCard
             titulo="Grado Vida"
             icon={Trophy}
             items={[
-              { label: "GWP Vida Riesgo Individual", actual: gwpVidaInd, objetivo: grados.vidaRiesgoInd ?? 10000 },
-              { label: "GWP Ahorro",                 actual: gwpAhorro,  objetivo: grados.ahorro       ?? 120000 },
+              { label: "GWPNP Vida Riesgo Individual", actual: gwpnpVidaInd, objetivo: grados.vidaRiesgoInd ?? 10000 },
+              { label: "GWPNP Ahorro",                 actual: gwpnpAhorro,  objetivo: grados.ahorro       ?? 120000 },
             ]}
           />
         </div>
