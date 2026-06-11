@@ -32,12 +32,16 @@ async function fetchProduction(year: number, month: number) {
 
 // ─── Extractores de datos ──────────────────────────────────────────────────────
 const lobGwp    = (nv: any[], lob: string) => toN(nv.find(r => r.lob?.toUpperCase() === lob && r.ramo === "Total" && !r.subramo)?.gwp)
+const lobGwpA   = (nv: any[], lob: string) => toN(nv.find(r => r.lob?.toUpperCase() === lob && r.ramo === "Total" && !r.subramo)?.gwpa)
 const lobGwpnp  = (nv: any[], lob: string) => toN(nv.find(r => r.lob?.toUpperCase() === lob && r.ramo === "Total" && !r.subramo)?.gwpnp)
 const subGwp    = (nv: any[], lob: string, sub: string) => toN(nv.find(r => r.lob?.toUpperCase() === lob && r.subramo?.toUpperCase() === sub)?.gwp)
+const subGwpA   = (nv: any[], lob: string, sub: string) => toN(nv.find(r => r.lob?.toUpperCase() === lob && r.subramo?.toUpperCase() === sub)?.gwpa)
 const subGwpnp  = (nv: any[], lob: string, sub: string) => toN(nv.find(r => r.lob?.toUpperCase() === lob && r.subramo?.toUpperCase() === sub)?.gwpnp)
 const vidaRiesgoNP = (vida: any[]) => vida.filter(r => r.lob === "Pure Protection").reduce((s, r) => s + toN(r.gwpnp), 0)
 const pscGwp    = (nv: any[], vida: any[]) =>
   subGwp(nv, "SALUD", "SALUDCOL") + vida.filter(r => r.negocio === "Colectivo").reduce((s, r) => s + toN(r.gwp), 0)
+const pscGwpA   = (nv: any[], vida: any[]) =>
+  subGwpA(nv, "SALUD", "SALUDCOL") + vida.filter(r => r.negocio === "Colectivo").reduce((s, r) => s + toN(r.gwpa), 0)
 const crec = (act: number, ant: number) => ant > 0 ? ((act - ant) / ant) * 100 : 0
 
 // ─── Sección wrapper ───────────────────────────────────────────────────────────
@@ -237,7 +241,6 @@ export default function ObjetivosPage() {
   const [month,   setMonth]   = useState(0)         // 0 = auto
   const [availableMonths, setAvailableMonths] = useState<number[]>([])
   const [prod,    setProd]    = useState<{ nv: any[]; vida: any[] }>({ nv: [], vida: [] })
-  const [prodAnt, setProdAnt] = useState<{ nv: any[]; vida: any[] }>({ nv: [], vida: [] })
   const [objetivos, setObjetivos] = useState<any>(null)
   const [loading,   setLoading]   = useState(true)
 
@@ -259,10 +262,9 @@ export default function ObjetivosPage() {
     setLoading(true)
     Promise.all([
       fetchProduction(year, effectiveMonth),
-      fetchProduction(year - 1, effectiveMonth),
       fetch(`/api/objetivos?year=${year}`).then(r => r.json()),
-    ]).then(([p, pa, obj]) => {
-      setProd(p); setProdAnt(pa); setObjetivos(obj)
+    ]).then(([p, obj]) => {
+      setProd(p); setObjetivos(obj)
     }).finally(() => setLoading(false))
   }, [year, effectiveMonth])
 
@@ -288,15 +290,15 @@ export default function ObjetivosPage() {
   const todasOk  = Object.values(condOk).every(Boolean)
   const tnpFact  = factorTNP(tnp)
 
-  // ── GWP por bloque (Rapel A: crecimiento) ────────────────────────────────
-  const gwpSaludInd    = subGwp(prod.nv,    "SALUD", "SALUDIND")
-  const gwpSaludIndAnt = subGwp(prodAnt.nv, "SALUD", "SALUDIND")
-  const gwpPart        = lobGwp(prod.nv,    "PARTICULARES")
-  const gwpPartAnt     = lobGwp(prodAnt.nv, "PARTICULARES")
-  const gwpEmp         = lobGwp(prod.nv,    "EMPRESAS")
-  const gwpEmpAnt      = lobGwp(prodAnt.nv, "EMPRESAS")
-  const gwpPsc         = pscGwp(prod.nv,    prod.vida)
-  const gwpPscAnt      = pscGwp(prodAnt.nv, prodAnt.vida)
+  // ── GWP por bloque (Rapel A: crecimiento) — gwpa = GWP año anterior en ARGOS ──
+  const gwpSaludInd    = subGwp (prod.nv, "SALUD", "SALUDIND")
+  const gwpSaludIndAnt = subGwpA(prod.nv, "SALUD", "SALUDIND")
+  const gwpPart        = lobGwp (prod.nv, "PARTICULARES")
+  const gwpPartAnt     = lobGwpA(prod.nv, "PARTICULARES")
+  const gwpEmp         = lobGwp (prod.nv, "EMPRESAS")
+  const gwpEmpAnt      = lobGwpA(prod.nv, "EMPRESAS")
+  const gwpPsc         = pscGwp (prod.nv, prod.vida)
+  const gwpPscAnt      = pscGwpA(prod.nv, prod.vida)
 
   // ── Cálculo del rapel A ───────────────────────────────────────────────────
   const devengos = useMemo(() => {
