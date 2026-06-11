@@ -2,16 +2,24 @@ import { NextResponse } from "next/server"
 import { supabaseServer } from "@/lib/supabaseServer"
 
 export async function GET() {
-  const { data, error } = await supabaseServer
-    .from("metrics")
-    .select("*")
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  if (error) {
-    console.error(error)
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/metrics?order=year,month`, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+    cache: "no-store",
+  })
+
+  if (!res.ok) {
+    console.error("metrics fetch error", res.status, await res.text())
     return NextResponse.json([])
   }
 
-  const formatted = data.map((m) => ({
+  const raw = await res.json()
+  const formatted = raw.map((m: any) => ({
     year: m.year,
     month: m.month,
     monthNumber: m.month,
