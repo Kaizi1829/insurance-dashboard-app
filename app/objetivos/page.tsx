@@ -160,15 +160,15 @@ function ProgressBar({ label, actual, objetivo }: { label: string; actual: numbe
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="font-medium text-slate-700">{label}</span>
-        <span className={`font-semibold ${ok ? "text-emerald-600" : "text-slate-600"}`}>
+        <span className={`font-semibold ${ok ? "text-emerald-600" : "text-slate-700"}`}>
           {fmtE(actual)} <span className="text-slate-400 font-normal">/ {fmtE(objetivo)}</span>
         </span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
         <div className={`h-full rounded-full transition-all ${ok ? "bg-emerald-500" : "bg-[#003A8F]"}`}
           style={{ width: `${pct}%` }} />
       </div>
-      <div className="text-[10px] text-right text-slate-400">{pct.toFixed(0)}% del objetivo</div>
+      <div className="text-[10px] text-right text-slate-400">{pct.toFixed(0)}%</div>
     </div>
   )
 }
@@ -448,69 +448,57 @@ export default function ObjetivosPage() {
       <Section number="2" title="Rapel de Nueva Producción"
         subtitle="Tasa de Nueva Producción (TNP) global de la agencia + objetivos cuatrimestrales GWPNP">
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Panel TNP */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Tasa de Nueva Producción (TNP)</h3>
-            <div className={`rounded-2xl border p-5 text-center mb-4 ${
-              tnpFact === 1 ? "border-emerald-200 bg-emerald-50"
-              : tnpFact > 0 ? "border-amber-200 bg-amber-50"
-              : "border-red-200 bg-red-50"
-            }`}>
-              <div className="text-xs text-slate-500 mb-1">TNP global agencia · {MESES[effectiveMonth - 1]} {year}</div>
-              <div className={`text-5xl font-bold ${
-                tnpFact === 1 ? "text-emerald-700" : tnpFact > 0 ? "text-amber-700" : "text-red-700"
-              }`}>{fmtPctAbs(tnp)}</div>
-              <div className={`mt-2 text-sm font-semibold ${
-                tnpFact === 1 ? "text-emerald-600" : tnpFact > 0 ? "text-amber-600" : "text-red-600"
+        {/* TNP — valor + tramos en pills */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-5">
+          <div className="space-y-1">
+            <div className="text-xs text-slate-400 uppercase tracking-wide font-medium">TNP global agencia · {MESES[effectiveMonth - 1]} {year}</div>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-3xl font-bold ${
+                tnpFact === 1 ? "text-emerald-700" : tnpFact > 0 ? "text-amber-600" : "text-red-600"
+              }`}>{fmtPctAbs(tnp)}</span>
+              <span className={`text-xs font-medium ${
+                tnpFact === 1 ? "text-emerald-600" : tnpFact > 0 ? "text-amber-500" : "text-red-500"
               }`}>
-                {tnpFact === 1  ? "✓ Tramo ≥15% — 100% de la parte TNP"
-                 : tnpFact > 0 ? "◐ Tramo ≥12,5% — 70% de la parte TNP"
-                 : "✗ < 12,5% — no se cobra la parte TNP (0€)"}
-              </div>
-            </div>
-            <div className="space-y-2">
-              {[
-                { label: "≥ 15%",           min: 15,   max: Infinity, factor: "100%", desc: "Cobras el total" },
-                { label: "≥ 12,5% y < 15%", min: 12.5, max: 15,      factor: "70%",  desc: "Cobras el 70%" },
-                { label: "< 12,5%",         min: 0,    max: 12.5,     factor: "0%",   desc: "No se cobra" },
-              ].map((t, i) => {
-                const isActive = tnp >= t.min && tnp < t.max
-                return (
-                  <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-3 border ${
-                    isActive ? "bg-[#003A8F] border-[#003A8F]" : "border-slate-100 bg-slate-50"
-                  }`}>
-                    <div>
-                      <div className={`font-semibold text-sm ${isActive ? "text-white" : "text-slate-700"}`}>{t.label}</div>
-                      <div className={`text-xs ${isActive ? "text-blue-200" : "text-slate-400"}`}>{t.desc}</div>
-                    </div>
-                    <div className={`text-2xl font-bold ${isActive ? "text-white" : "text-slate-400"}`}>{t.factor}</div>
-                  </div>
-                )
-              })}
+                {tnpFact === 1 ? "✓ 100% de la parte TNP" : tnpFact > 0 ? "◐ 70% de la parte TNP" : "✗ No se cobra la parte TNP"}
+              </span>
             </div>
           </div>
+          <div className="flex gap-2">
+            {[
+              { label: "≥ 15%", min: 15, max: Infinity, factor: "100%" },
+              { label: "≥ 12,5%", min: 12.5, max: 15, factor: "70%" },
+              { label: "< 12,5%", min: 0, max: 12.5, factor: "0%" },
+            ].map((t, i) => {
+              const isActive = tnp >= t.min && tnp < t.max
+              return (
+                <div key={i} className={`flex flex-col items-center px-3 py-2 rounded-xl border text-xs ${
+                  isActive ? "bg-[#003A8F] border-[#003A8F] text-white" : "border-slate-100 bg-slate-50 text-slate-400"
+                }`}>
+                  <span className="font-semibold">{t.label}</span>
+                  <span className={`text-sm font-bold ${isActive ? "text-white" : "text-slate-500"}`}>{t.factor}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
-          {/* Cuatrimestral */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">
-              Objetivos cuatrimestrales de NP
-              <span className="ml-2 text-xs font-normal text-slate-400">
-                {q === 1 ? "Q1 · Ene–Abr" : q === 2 ? "Q2 · May–Ago" : "Q3 · Sep–Dic"}
-              </span>
-            </h3>
-            <div className="space-y-5">
-              {Object.entries(objQ).length > 0
-                ? Object.entries(objQ).map(([key, obj]: any) => {
-                    const actual = gwpnpBloque[key] ?? 0
-                    if (obj === 0 && actual === 0) return null
-                    return <ProgressBar key={key} label={LOB_LABELS[key] ?? key} actual={actual} objetivo={obj} />
-                  })
-                : <p className="text-sm text-slate-400 py-4">
-                    Objetivos cuatrimestrales pendientes de configurar.
-                  </p>
-              }
-            </div>
+        {/* Objetivos cuatrimestrales */}
+        <div>
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            Objetivos cuatrimestrales GWPNP
+            <span className="ml-2 normal-case font-normal text-slate-400">
+              {q === 1 ? "Q1 · Ene–Abr" : q === 2 ? "Q2 · May–Ago" : "Q3 · Sep–Dic"}
+            </span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Object.entries(objQ).length > 0
+              ? Object.entries(objQ).map(([key, obj]: any) => {
+                  const actual = gwpnpBloque[key] ?? 0
+                  if (obj === 0 && actual === 0) return null
+                  return <ProgressBar key={key} label={LOB_LABELS[key] ?? key} actual={actual} objetivo={obj} />
+                })
+              : <p className="text-sm text-slate-400 col-span-3">Objetivos cuatrimestrales pendientes de configurar.</p>
+            }
           </div>
         </div>
       </Section>
