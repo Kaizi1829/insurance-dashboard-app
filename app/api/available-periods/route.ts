@@ -1,48 +1,41 @@
 import { NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabaseServer"
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function query(table: string, params: Record<string, string>) {
+  const qs = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${qs}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) return []
+  return res.json()
+}
 
 export async function GET() {
-  // Períodos disponibles en argos (para página ARGOS)
-  const { data: argosData } = await supabaseServer
-    .from("argos_no_vida")
-    .select("year, month")
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
+  const [argosRaw, metricsRaw] = await Promise.all([
+    query('argos_no_vida', { select: 'year,month', order: 'year.desc,month.desc' }),
+    query('metrics', { select: 'year,month', mediator_code: 'eq.GLOBAL', order: 'year.desc,month.desc' }),
+  ])
 
-  // Períodos disponibles en metrics (para Home, Medofis, Seguimiento)
-  const { data: metricsData } = await supabaseServer
-    .from("metrics")
-    .select("year, month")
-    .eq("mediator_code", "GLOBAL")
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-
-  // Deduplica y construye lista única para argos
-  const argosSet = new Map<string, { year: number; month: number }>()
-  for (const row of argosData ?? []) {
-    const key = `${row.year}-${row.month}`
-    if (!argosSet.has(key)) argosSet.set(key, { year: row.year, month: row.month })
+  const dedup = (rows: any[]) => {
+    const seen = new Map<string, { year: number; month: number }>()
+    for (const r of rows ?? []) {
+      const k = `${r.year}-${r.month}`
+      if (!seen.has(k)) seen.set(k, { year: Number(r.year), month: Number(r.month) })
+    }
+    return Array.from(seen.values()).sort((a, b) => b.year - a.year || b.month - a.month)
   }
-  const argosPeriods = Array.from(argosSet.values()).sort(
-    (a, b) => b.year - a.year || b.month - a.month
-  )
 
-  // Deduplica para metrics
-  const metricsSet = new Map<string, { year: number; month: number }>()
-  for (const row of metricsData ?? []) {
-    const key = `${row.year}-${row.month}`
-    if (!metricsSet.has(key)) metricsSet.set(key, { year: row.year, month: row.month })
-  }
-  const metricsPeriods = Array.from(metricsSet.values()).sort(
-    (a, b) => b.year - a.year || b.month - a.month
-  )
-
-  // El último período disponible en cada fuente
-  const latestArgos = argosPeriods[0] ?? null
-  const latestMetrics = metricsPeriods[0] ?? null
+  const argosPeriods  = dedup(argosRaw)
+  const metricsPeriods = dedup(metricsRaw)
 
   return NextResponse.json(
-    { argos: { periods: argosPeriods, latest: latestArgos }, metrics: { periods: metricsPeriods, latest: latestMetrics } },
+    {
+      argos:   { periods: argosPeriods,   latest: argosPeriods[0]   ?? null },
+      metrics: { periods: metricsPeriods, latest: metricsPeriods[0] ?? null },
+    },
     { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
   )
 }
