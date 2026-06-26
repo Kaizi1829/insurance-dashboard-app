@@ -77,23 +77,21 @@ function Section({ number, title, subtitle, children, accent = "#003A8F", collap
   )
 }
 
-// ─── Fila de condición ─────────────────────────────────────────────────────────
-function FilaCondicion({ label, valor, objetivo, ok, esEuros = false }: {
+// ─── Pill de condición ─────────────────────────────────────────────────────────
+function PillCondicion({ label, valor, objetivo, ok, esEuros = false }: {
   label: string; valor: number; objetivo: string; ok: boolean; esEuros?: boolean
 }) {
   return (
-    <div className={`grid grid-cols-[2fr_1fr_1fr_auto] items-center gap-4 px-4 py-3 rounded-xl border transition-colors ${
-      ok ? "border-emerald-100 bg-emerald-50/40" : "border-red-100 bg-red-50/30"
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs ${
+      ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
     }`}>
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      <span className={`text-sm font-bold text-right ${ok ? "text-emerald-700" : "text-red-600"}`}>
-        {esEuros ? fmtE(valor) : fmtPctAbs(valor)}
-      </span>
-      <span className="text-xs text-slate-400 text-right">{objetivo}</span>
       {ok
-        ? <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
-        : <XCircle     size={18} className="text-red-400 flex-shrink-0" />
+        ? <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
+        : <XCircle      size={13} className="text-red-400 flex-shrink-0" />
       }
+      <span className="font-medium">{label}</span>
+      <span className="font-bold">{esEuros ? fmtE(valor) : fmtPctAbs(valor)}</span>
+      <span className={`${ok ? "text-emerald-500" : "text-red-400"}`}>{objetivo}</span>
     </div>
   )
 }
@@ -110,8 +108,9 @@ function BloqueGwp({ label, gwpAct, gwpAnt, crecPct, tabla, condOk }: {
   const color = crecPct > 0 ? "text-emerald-600" : crecPct < 0 ? "text-red-500" : "text-slate-400"
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 overflow-hidden">
-      <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100">
+    <div className="rounded-xl border border-slate-100 bg-white p-4 space-y-3">
+      {/* Cabecera */}
+      <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-800">{label}</span>
         {sinDato
           ? <span className="text-xs text-slate-400">Sin dato anterior</span>
@@ -121,37 +120,31 @@ function BloqueGwp({ label, gwpAct, gwpAnt, crecPct, tabla, condOk }: {
             </span>
         }
       </div>
-      <div className="px-4 py-2 flex gap-6 text-xs">
-        <div>
-          <div className="text-slate-400">GWP año anterior</div>
-          <div className="font-semibold text-slate-600">{sinDato ? "—" : fmtE(gwpAnt)}</div>
-        </div>
-        <div>
-          <div className="text-slate-400">GWP año actual</div>
-          <div className="font-semibold text-slate-800">{fmtE(gwpAct)}</div>
-        </div>
+      {/* GWP anterior → actual */}
+      <div className="flex gap-4 text-xs text-slate-500">
+        <span>{sinDato ? "—" : fmtE(gwpAnt)} <span className="text-slate-300">→</span> <span className="font-semibold text-slate-700">{fmtE(gwpAct)}</span></span>
       </div>
-      <div className="px-3 pb-3 flex gap-1">
+      {/* Tramos */}
+      <div className="flex gap-1">
         {tabla.map((t, i) => {
           const isActive = i === tramoIdx
           const isPast   = i < tramoIdx
           return (
             <div key={i} className={`flex-1 rounded-lg px-1 py-1.5 text-center text-[10px] transition-all ${
-              isActive ? "bg-[#003A8F] text-white font-bold shadow-sm"
-              : isPast  ? "bg-emerald-100 text-emerald-700 font-medium"
-              : "bg-white border border-slate-200 text-slate-400"
+              isActive ? "bg-[#003A8F] text-white font-bold"
+              : isPast  ? "bg-emerald-100 text-emerald-700"
+              : "bg-slate-50 border border-slate-100 text-slate-400"
             }`}>
-              <div className="font-semibold">≥{t.min}%</div>
-              <div className={isActive ? "text-blue-200 text-[9px]" : "text-[9px]"}>{t.pct}%</div>
+              <div>≥{t.min}%</div>
+              <div className="opacity-70">{t.pct}%</div>
             </div>
           )
         })}
       </div>
-      <div className={`px-4 py-2.5 text-xs flex items-center justify-between border-t ${
-        devengo > 0 ? "border-emerald-100 bg-emerald-50" : "border-slate-100 bg-white"
-      }`}>
+      {/* Aportación */}
+      <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
         <span className="text-slate-400">Aportación estimada</span>
-        <span className={`font-bold text-sm ${devengo > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+        <span className={`font-bold text-sm ${devengo > 0 ? "text-emerald-700" : "text-slate-300"}`}>
           {devengo > 0 ? fmtE(devengo) : "—"}
         </span>
       </div>
@@ -395,66 +388,52 @@ export default function ObjetivosPage() {
         subtitle="Combinación de crecimiento de cartera (70%) + nueva producción (30%) · liquidación al cierre del año"
         collapsible>
 
-        {/* Resumen en grande */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden mb-5">
-          <div className="px-5 py-5 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Rapel estimado · si cerráramos hoy</div>
-              <div className="text-xs text-slate-400">Requiere cumplir las 5 condiciones</div>
-            </div>
-            <div className="text-right">
-              <div className="text-4xl font-bold text-slate-900">{fmtE(devengos.total)}</div>
-              <div className="text-xs text-slate-400 mt-1">
-                {devengos.total >= CONDICIONES_2026.devengMax
-                  ? "⚠ Tope máximo (125.000€)"
-                  : `Faltan ${fmtE(CONDICIONES_2026.devengMax - devengos.total)} para el máximo`}
-              </div>
+        {/* Resumen */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-5">
+          <div className="space-y-1">
+            <div className="text-xs text-slate-400 uppercase tracking-wide font-medium">Rapel estimado · si cerráramos hoy</div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-xs text-slate-500">Crec. GWP (70%): <span className="font-semibold text-slate-700">{fmtE(devengos.crecimiento)}</span></span>
+              <span className="text-slate-300">·</span>
+              <span className="text-xs text-slate-500">Nueva Prod. (30%): <span className="font-semibold text-slate-700">{fmtE(devengos.nuevaProd)}</span></span>
             </div>
           </div>
-          <div className="border-t border-slate-200 grid grid-cols-2 divide-x divide-slate-200 bg-white">
-            <div className="px-5 py-3 flex items-center justify-between">
-              <span className="text-slate-500 text-xs">Crecimiento GWP (70%)</span>
-              <span className="font-semibold text-slate-800 text-sm">{fmtE(devengos.crecimiento)}</span>
-            </div>
-            <div className="px-5 py-3 flex items-center justify-between">
-              <span className="text-slate-500 text-xs">Nueva Producción (30%)</span>
-              <span className="font-semibold text-slate-800 text-sm">{fmtE(devengos.nuevaProd)}</span>
+          <div className="text-right">
+            <div className="text-3xl font-bold text-slate-900">{fmtE(devengos.total)}</div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              {devengos.total >= CONDICIONES_2026.devengMax
+                ? "⚠ Tope máximo (125.000€)"
+                : `Faltan ${fmtE(CONDICIONES_2026.devengMax - devengos.total)} para el máximo`}
             </div>
           </div>
         </div>
 
-        {/* Condiciones */}
+        {/* Condiciones — pills compactos */}
         <div className="mb-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-slate-700">Condiciones para cobrar</h3>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-              todasOk ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-            }`}>
-              {todasOk ? "✓ Todas cumplidas" : "⚠ Pendientes"}
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Condiciones para cobrar</span>
+            {!todasOk && (
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertCircle size={12}/> El rapel real sería 0€ hasta cumplir todas
+              </span>
+            )}
           </div>
-          <div className="space-y-2">
-            <FilaCondicion label="Crecimiento GWP IARD"  valor={crecIARD}  objetivo="> 0%"                              ok={condOk.crecimiento} />
-            <FilaCondicion label="CoR (rentabilidad)"    valor={cor}        objetivo="< 100%"                            ok={condOk.cor} />
-            <FilaCondicion label="Pendiente de cobro"    valor={pendiente}  objetivo="< 2%"                              ok={condOk.pendiente} />
-            <FilaCondicion label="Vida Riesgo NP"        valor={vidaRNP}    objetivo={`≥ ${fmtE(CONDICIONES_2026.vidaRiesgoMin)}`} ok={condOk.vida}  esEuros />
-            <FilaCondicion label="Salud NP"              valor={saludNP}    objetivo={`≥ ${fmtE(CONDICIONES_2026.saludMin)}`}      ok={condOk.salud} esEuros />
+          <div className="flex flex-wrap gap-2">
+            <PillCondicion label="Crec. IARD"   valor={crecIARD}  objetivo="> 0%"   ok={condOk.crecimiento} />
+            <PillCondicion label="CoR"           valor={cor}       objetivo="< 100%" ok={condOk.cor} />
+            <PillCondicion label="Pendiente"     valor={pendiente} objetivo="< 2%"   ok={condOk.pendiente} />
+            <PillCondicion label="Vida NP"       valor={vidaRNP}   objetivo={`≥ ${fmtE(CONDICIONES_2026.vidaRiesgoMin)}`} ok={condOk.vida}  esEuros />
+            <PillCondicion label="Salud NP"      valor={saludNP}   objetivo={`≥ ${fmtE(CONDICIONES_2026.saludMin)}`}      ok={condOk.salud} esEuros />
           </div>
-          {!todasOk && (
-            <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 flex gap-2 text-xs text-amber-800">
-              <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-              Mientras haya condiciones sin cumplir el cálculo de arriba es el potencial. El rapel real sería 0€.
-            </div>
-          )}
         </div>
 
         {/* Calculadora por segmento */}
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 mb-3">
-            Calculadora de devengo por segmento
-            <span className="ml-2 text-xs font-normal text-slate-400">GWP actual vs anterior · tramos del contrato</span>
-          </h3>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            Devengo por segmento
+            <span className="ml-2 normal-case font-normal text-slate-400">GWP actual vs anterior · tramos del contrato</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <BloqueGwp label="Salud Individual" gwpAct={gwpSaludInd} gwpAnt={gwpSaludIndAnt} crecPct={crecSaludInd} tabla={RAPEL_TABLAS_2026.saludInd}    condOk={true} />
             <BloqueGwp label="Particulares"     gwpAct={gwpPart}    gwpAnt={gwpPartAnt}     crecPct={crecPart}     tabla={RAPEL_TABLAS_2026.particulares} condOk={true} />
             <BloqueGwp label="Empresas"         gwpAct={gwpEmp}     gwpAnt={gwpEmpAnt}      crecPct={crecEmp}      tabla={RAPEL_TABLAS_2026.empresas}     condOk={true} />
