@@ -152,7 +152,7 @@ function nvLobAgg(rows: NVRow[], lob: string): ProdVal & ProdExtra {
 function nvRamos(rows: NVRow[], lob: string): string[] {
   return [...new Set(
     rows
-      .filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total")
+      .filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo != null && r.ramo !== "Total")
       .map(r => r.ramo)
   )].sort()
 }
