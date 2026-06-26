@@ -223,9 +223,9 @@ export default function HomePage() {
           .sort((a, b) => b - a)
         setYears(avail)
 
-        if (year === 0 && periodsJson?.metrics?.latest) {
-          setYear(periodsJson.metrics.latest.year)
-          setSelectedMonth(0)
+        if (year === 0) {
+          const latestYear = periodsJson?.metrics?.latest?.year ?? avail[0] ?? 0
+          if (latestYear) { setYear(latestYear); setSelectedMonth(0) }
         }
       } catch (e) {
         console.error(e)
