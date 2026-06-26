@@ -2,696 +2,552 @@
 
 import { useEffect, useMemo, useState } from "react"
 import {
-  BadgeEuro,
-  ShieldCheck,
-  TrendingUp,
-  Percent,
-  ArrowUpRight,
-  Target,
+  BadgeEuro, ShieldCheck, TrendingUp, Percent, ArrowUpRight, Target, AlertTriangle,
 } from "lucide-react"
-
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  CartesianGrid,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+  CartesianGrid, LineChart, Line, XAxis, YAxis, ReferenceLine,
 } from "recharts"
-
 import ProgressCard from "./components/ProgressCard"
 
-const COLORS = [
-  "#F6D88A", // Particulares
-  "#9CC3FF", // Empresa
-  "#F6A6A6", // Vida
-  "#C8A2FF", // Ahorro
-  "#9FE3B0", // PSC
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const COLORS = ["#F6D88A","#9CC3FF","#F6A6A6","#C8A2FF","#9FE3B0","#FDB97D"]
+const MEDOFIS_COLORS = ["#003A8F","#F6D88A","#9CC3FF","#9FE3B0","#C8A2FF","#F6A6A6"]
+
+const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+const MONTHS_FULL = [
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
 ]
 
-const MONTHS = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
-]
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toNumber(value: any) {
-  if (value === undefined || value === null || value === "") return 0
-  if (typeof value === "number") return value
+function toNumber(v: any): number {
+  if (v === undefined || v === null || v === "") return 0
+  if (typeof v === "number") return v
+  let s = v.toString().trim().replace("€","").replace(/\s/g,"")
+  if (s.includes(",") && s.includes(".")) s = s.replace(/\./g,"").replace(",",".")
+  else if (s.includes(",")) s = s.replace(",",".")
+  return Number(s.replace(/[^0-9.-]/g,"")) || 0
+}
 
-  let str = value.toString().trim().replace("€", "").replace(/\s/g, "")
+function fmtInt(v: any) {
+  const n = toNumber(v), sign = n < 0 ? "-" : "", abs = Math.abs(n)
+  return sign + Math.round(abs).toLocaleString("es-ES")
+}
+function fmtEuros(v: any) { return `${fmtInt(v)} €` }
+function fmtPct(v: any) {
+  const n = toNumber(v), sign = n < 0 ? "-" : "", abs = Math.abs(n)
+  return `${sign}${abs.toFixed(2).replace(".",",")}%`
+}
 
-  const hasComma = str.includes(",")
-  const hasDot = str.includes(".")
+function getMediatorCode(m: any) { return m?.mediator_code ?? m?.mediatorCode ?? "" }
 
-  if (hasComma && hasDot) {
-    str = str.replace(/\./g, "").replace(",", ".")
-  } else if (hasComma) {
-    str = str.replace(",", ".")
+// ─── Pie label — renders outside the arc, no threshold ────────────────────────
+
+function PieLabel({ cx, cy, midAngle, outerRadius, percent }: any) {
+  if (!percent || percent < 0.005) return null  // only skip truly invisible slivers
+  const R = Math.PI / 180
+  const r = outerRadius + 32
+  const x = cx + r * Math.cos(-midAngle * R)
+  const y = cy + r * Math.sin(-midAngle * R)
+  return (
+    <text
+      x={x} y={y} fill="#475569"
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      fontSize={11} fontWeight={600}
+    >
+      {`${Math.round(percent * 100)}%`}
+    </text>
+  )
+}
+
+// ─── Production data helpers ──────────────────────────────────────────────────
+
+type NVRow   = { lob: string; ramo: string; subramo: string | null; gwp: any; gwpnp: any; gwpnpa: any; np: any; np_ant: any; net_inflow: any }
+type VRow    = { lob: string; negocio: string; gwpnp: any; gwpnpa: any; gwp: any; gwpa: any }
+type ProdVal = { actual: number; anterior: number }
+type ProdExtra = { np: number; np_ant: number; netInflow: number; tasaNp: number; primMedia: number }
+type ProdRow = { name: string; actual: number; anterior: number; color: string; isHighlighted: boolean } & ProdExtra
+
+function titleCase(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
+
+// Aggregate all subramo rows for a given lob + ramo
+function nvRamoAgg(rows: NVRow[], lob: string, ramo: string): ProdVal & ProdExtra {
+  const match = rows.filter(r =>
+    r.lob?.toUpperCase() === lob.toUpperCase() &&
+    r.ramo?.toUpperCase() === ramo.toUpperCase()
+  )
+  const gwpnp   = match.reduce((s, r) => s + toNumber(r.gwpnp), 0)
+  const gwpnpa  = match.reduce((s, r) => s + toNumber(r.gwpnpa), 0)
+  const gwp     = match.reduce((s, r) => s + toNumber(r.gwp), 0)
+  const np      = match.reduce((s, r) => s + toNumber(r.np), 0)
+  const np_ant  = match.reduce((s, r) => s + toNumber(r.np_ant), 0)
+  const netInf  = match.reduce((s, r) => s + toNumber(r.net_inflow), 0)
+  return {
+    actual: gwpnp, anterior: gwpnpa,
+    np, np_ant, netInflow: netInf,
+    tasaNp:   gwp > 0 ? (gwpnp / gwp) * 100 : 0,
+    primMedia: np > 0 ? gwpnp / np : 0,
   }
-
-  str = str.replace(/[^0-9.-]/g, "")
-  return Number(str) || 0
 }
 
-function formatNumberEs(value: any, decimals = 2) {
-  const n = toNumber(value)
-  const sign = n < 0 ? "-" : ""
-  const abs = Math.abs(n)
-
-  const [integerPart, decimalPart] = abs.toFixed(decimals).split(".")
-  const integerWithDots = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-
-  if (!decimalPart || decimalPart === "00") {
-    return sign + integerWithDots
+// Specific subramo row
+function nvSubramoAgg(rows: NVRow[], lob: string, subramo: string): ProdVal & ProdExtra {
+  const r = rows.find(r =>
+    r.lob?.toUpperCase() === lob.toUpperCase() &&
+    r.subramo?.toUpperCase() === subramo.toUpperCase()
+  )
+  const gwpnp  = toNumber(r?.gwpnp)
+  const gwp    = toNumber(r?.gwp)
+  const np     = toNumber(r?.np)
+  return {
+    actual: gwpnp, anterior: toNumber(r?.gwpnpa),
+    np, np_ant: toNumber(r?.np_ant), netInflow: toNumber(r?.net_inflow),
+    tasaNp:   gwp > 0 ? (gwpnp / gwp) * 100 : 0,
+    primMedia: np > 0 ? gwpnp / np : 0,
   }
-
-  const trimmedDecimals = decimalPart.replace(/0+$/, "")
-  return trimmedDecimals
-    ? `${sign}${integerWithDots},${trimmedDecimals}`
-    : sign + integerWithDots
 }
 
-function formatEuros(value: any) {
-  return `${formatNumberEs(value, 0)} €`
-}
-
-function formatPercent(value: any) {
-  return `${formatNumberEs(value)}%`
-}
-
-function getMediatorCode(metric: any) {
-  return metric?.mediator_code ?? metric?.mediatorCode ?? ""
-}
-
-function percentLabel({ percent }: any) {
-  if (!percent || percent < 0.04) return ""
-  return `${(percent * 100).toFixed(0)}%`
-}
-
-function getValueByPath(source: any, path: string) {
-  if (!source) return 0
-
-  const parts = path.split(".")
-  let current = source
-
-  for (const part of parts) {
-    if (current == null) return 0
-    current = current[part]
+// LOB total row (ramo='Total', subramo=null)
+function nvLobAgg(rows: NVRow[], lob: string): ProdVal & ProdExtra {
+  const r = rows.find(r =>
+    r.lob?.toUpperCase() === lob.toUpperCase() &&
+    r.ramo === "Total" && !r.subramo
+  )
+  if (r) {
+    const gwpnp = toNumber(r.gwpnp)
+    const gwp   = toNumber(r.gwp)
+    const np    = toNumber(r.np)
+    return {
+      actual: gwpnp, anterior: toNumber(r.gwpnpa),
+      np, np_ant: toNumber(r.np_ant), netInflow: toNumber(r.net_inflow),
+      tasaNp:   gwp > 0 ? (gwpnp / gwp) * 100 : 0,
+      primMedia: np > 0 ? gwpnp / np : 0,
+    }
   }
-
-  return toNumber(current)
+  // Fallback: aggregate from ramo rows
+  const uniqRamos = [...new Set(
+    rows.filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total").map(r => r.ramo)
+  )]
+  const agg = uniqRamos.reduce((acc, ramo) => {
+    const v = nvRamoAgg(rows, lob, ramo)
+    return { ...acc, actual: acc.actual + v.actual, anterior: acc.anterior + v.anterior,
+      np: acc.np + v.np, np_ant: acc.np_ant + v.np_ant, netInflow: acc.netInflow + v.netInflow }
+  }, { actual: 0, anterior: 0, np: 0, np_ant: 0, netInflow: 0 } as ProdVal & ProdExtra)
+  const gwpAll = rows.filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo !== "Total")
+    .reduce((s, r) => s + toNumber(r.gwp), 0)
+  return {
+    ...agg,
+    tasaNp:   gwpAll > 0 ? (agg.actual / gwpAll) * 100 : 0,
+    primMedia: agg.np > 0 ? agg.actual / agg.np : 0,
+  }
 }
+
+// Get all unique ramo names for a LOB (excluding 'Total')
+function nvRamos(rows: NVRow[], lob: string): string[] {
+  return [...new Set(
+    rows
+      .filter(r => r.lob?.toUpperCase() === lob.toUpperCase() && r.ramo != null && r.ramo !== "Total")
+      .map(r => r.ramo)
+  )].sort()
+}
+
+// Build rows dynamically from whatever ramos exist for a LOB
+function buildLobRows(rows: NVRow[], lob: string, color: string): ProdRow[] {
+  const ramos = nvRamos(rows, lob)
+  const dataRows: ProdRow[] = ramos.map(ramo => ({
+    name: titleCase(ramo),
+    ...nvRamoAgg(rows, lob, ramo),
+    color,
+    isHighlighted: false,
+  }))
+  dataRows.push({
+    name: `Total ${titleCase(lob)}`,
+    ...nvLobAgg(rows, lob),
+    color,
+    isHighlighted: true,
+  })
+  return dataRows
+}
+
+const NO_EXTRA: ProdExtra = { np: 0, np_ant: 0, netInflow: 0, tasaNp: 0, primMedia: 0 }
+
+// Vida / Ahorro by product (lob) and optionally by negocio (Individual / Colectivo)
+function vidaByLob(rows: VRow[], lob: string, negocio?: string): ProdVal & ProdExtra {
+  const match = rows.filter(r =>
+    r.lob === lob && (!negocio || r.negocio === negocio)
+  )
+  return {
+    actual:   match.reduce((s, r) => s + toNumber(r.gwpnp ?? r.gwp), 0),
+    anterior: match.reduce((s, r) => s + toNumber(r.gwpnpa ?? r.gwpa), 0),
+    ...NO_EXTRA,
+  }
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const [year, setYear] = useState(2026)
-  const [metrics, setMetrics] = useState<any[]>([])
-  const [data, setData] = useState<any>(null)
-  const [previousData, setPreviousData] = useState<any>(null)
-  const [years, setYears] = useState<number[]>([])
-  const [objetivos, setObjetivos] = useState<any>(null)
-  const [titleDate, setTitleDate] = useState("")
+  const [year, setYear]               = useState(0)
+  const [selectedMonth, setSelectedMonth] = useState(0)
+  const [metrics, setMetrics]         = useState<any[]>([])
+  const [years, setYears]             = useState<number[]>([])
+  const [objetivos, setObjetivos]     = useState<any>(null)
+  const [nvRows, setNvRows]           = useState<NVRow[]>([])
+  const [vidaRows, setVidaRows]       = useState<VRow[]>([])
 
+  // ── Load metrics on year change ──
   useEffect(() => {
     async function load() {
       try {
-        const [metricsRes, objetivosRes] = await Promise.all([
+        const [metricsRes, objetivosRes, periodsRes] = await Promise.all([
           fetch("/api/metrics"),
           fetch("/api/objetivos"),
+          fetch("/api/available-periods"),
         ])
-
-        const metricsJson = await metricsRes.json()
+        const periodsJson   = await periodsRes.json()
+        const metricsJson   = await metricsRes.json()
         const objetivosJson = await objetivosRes.json()
 
-        if (!Array.isArray(metricsJson)) {
-          setMetrics([])
-          setData(null)
-          setPreviousData(null)
-          setYears([])
-          setObjetivos(null)
-          setTitleDate("")
-          return
-        }
+        if (!Array.isArray(metricsJson)) return
 
         setMetrics(metricsJson)
+        setObjetivos(objetivosJson ?? null)
 
-        const availableYears = [...new Set(metricsJson.map((m: any) => Number(m.year)))]
+        const avail = [...new Set(metricsJson.map((m: any) => Number(m.year)))]
           .filter((y): y is number => !Number.isNaN(y))
           .sort((a, b) => b - a)
+        setYears(avail)
 
-        setYears(availableYears)
-
-        const globalYear = metricsJson
-          .filter(
-            (m: any) =>
-              Number(m.year) === year &&
-              getMediatorCode(m) === "GLOBAL"
-          )
-          .sort((a: any, b: any) => Number(a.month) - Number(b.month))
-
-        if (globalYear.length > 0) {
-          const last = globalYear[globalYear.length - 1]
-          const previous =
-            globalYear.length > 1 ? globalYear[globalYear.length - 2] : null
-
-          setData(last)
-          setPreviousData(previous)
-
-          const monthNumber = Number(last.month)
-          const monthLabel =
-            monthNumber >= 1 && monthNumber <= 12
-              ? MONTHS[monthNumber - 1]
-              : ""
-
-          setTitleDate(monthLabel ? `${monthLabel} ${last.year}` : `${last.year}`)
-        } else {
-          setData(null)
-          setPreviousData(null)
-          setTitleDate("")
+        if (year === 0) {
+          const latestYear = periodsJson?.metrics?.latest?.year ?? avail[0] ?? 0
+          if (latestYear) { setYear(latestYear); setSelectedMonth(0) }
         }
-
-        setObjetivos(objetivosJson?.[year] ?? null)
-      } catch (error) {
-        console.error("Error cargando home:", error)
-        setMetrics([])
-        setData(null)
-        setPreviousData(null)
-        setYears([])
-        setObjetivos(null)
-        setTitleDate("")
+      } catch (e) {
+        console.error(e)
       }
     }
-
     load()
   }, [year])
 
+  // ── Derived from metrics ──
+  const globalYear = useMemo(() =>
+    metrics
+      .filter(m => Number(m.year) === year && getMediatorCode(m) === "GLOBAL")
+      .sort((a, b) => Number(a.month) - Number(b.month)),
+    [metrics, year]
+  )
+
+  const availableMonths = useMemo(() => globalYear.map(m => Number(m.month)), [globalYear])
+
+  const effectiveMonth = useMemo(() => {
+    if (selectedMonth && availableMonths.includes(selectedMonth)) return selectedMonth
+    return availableMonths[availableMonths.length - 1] ?? 0
+  }, [selectedMonth, availableMonths])
+
+  const data         = useMemo(() => globalYear.find(m => Number(m.month) === effectiveMonth) ?? null, [globalYear, effectiveMonth])
+  const previousData = useMemo(() => {
+    if (!data) return null
+    const idx = globalYear.findIndex(m => Number(m.month) === effectiveMonth)
+    return idx > 0 ? globalYear[idx - 1] : null
+  }, [globalYear, data, effectiveMonth])
+
+  // ── Load production data when year/month changes ──
+  useEffect(() => {
+    if (!effectiveMonth) return
+    fetch(`/api/production?year=${year}&month=${effectiveMonth}&medor=742776&medofis=TOTAL`)
+      .then(r => r.json())
+      .then(d => {
+        setNvRows(Array.isArray(d.nv) ? d.nv : [])
+        setVidaRows(Array.isArray(d.vida) ? d.vida : [])
+      })
+      .catch(console.error)
+  }, [year, effectiveMonth])
+
+  // ── Production groups ──
+  const productionGroups = useMemo(() => {
+    const nv = nvRows
+    const v  = vidaRows
+
+    // Particulares & Empresa: dynamically discover ramos from real data
+    const partRows = buildLobRows(nv, "PARTICULARES", COLORS[0])
+    const empRows  = buildLobRows(nv, "EMPRESAS",     COLORS[1])
+
+    // Salud: always show Individual + Colectivo even if value=0
+    const saludRows: ProdRow[] = [
+      { name: "Individual", ...nvSubramoAgg(nv, "SALUD", "SALUDIND"), color: COLORS[4], isHighlighted: false },
+      { name: "Colectivo",  ...nvSubramoAgg(nv, "SALUD", "SALUDCOL"), color: COLORS[4], isHighlighted: false },
+      { name: "Total Salud", ...nvLobAgg(nv, "SALUD"),                 color: COLORS[4], isHighlighted: true  },
+    ]
+
+    // Vida (Pure Protection): Individual + Colectivo — always show
+    const vidaGrupo: ProdRow[] = [
+      { name: "Individual", ...vidaByLob(v, "Pure Protection", "Individual"), color: COLORS[2], isHighlighted: false },
+      { name: "Colectivo",  ...vidaByLob(v, "Pure Protection", "Colectivo"),  color: COLORS[2], isHighlighted: false },
+      { name: "Total Vida", ...vidaByLob(v, "Pure Protection"),               color: COLORS[2], isHighlighted: true  },
+    ]
+
+    // Ahorro: GA + UL + Protection w/s
+    const ahorroProd = ["General Account", "Unit Linked", "Protection w/s"] as const
+    const ahorroAct  = ahorroProd.reduce((s, lob) => s + vidaByLob(v, lob).actual,   0)
+    const ahorroAnt  = ahorroProd.reduce((s, lob) => s + vidaByLob(v, lob).anterior, 0)
+    const ahorroRows: ProdRow[] = [
+      { name: "General Account", ...vidaByLob(v, "General Account"), color: COLORS[3], isHighlighted: false },
+      { name: "Unit Linked",     ...vidaByLob(v, "Unit Linked"),      color: COLORS[3], isHighlighted: false },
+      { name: "Protection w/s",  ...vidaByLob(v, "Protection w/s"),   color: COLORS[3], isHighlighted: false },
+      { name: "Total Ahorro", actual: ahorroAct, anterior: ahorroAnt, color: COLORS[3], isHighlighted: true, ...NO_EXTRA },
+    ]
+
+    return {
+      particulares: partRows,
+      empresa:      empRows,
+      salud:        saludRows,
+      vida:         vidaGrupo,
+      ahorro:       ahorroRows,
+    }
+  }, [nvRows, vidaRows])
+
+  // ── Yearly & monthly GWP trend ──
   const yearlyData = useMemo(() => {
-    if (!metrics.length) return []
-
     const grouped: Record<number, any[]> = {}
-
-    metrics.forEach((m: any) => {
+    metrics.forEach(m => {
       if (getMediatorCode(m) !== "GLOBAL") return
-
       const y = Number(m.year)
-      if (Number.isNaN(y)) return
-
       if (!grouped[y]) grouped[y] = []
       grouped[y].push(m)
     })
-
     return Object.entries(grouped)
-      .map(([yearKey, arr]) => {
-        const sorted = [...arr].sort(
-          (a: any, b: any) => Number(a.month) - Number(b.month)
-        )
-
-        const last = sorted[sorted.length - 1]
-
-        return {
-          year: Number(yearKey),
-          gwp: toNumber(last?.medofis?.gwp),
-        }
+      .map(([yr, arr]) => {
+        const last = [...arr].sort((a, b) => Number(a.month) - Number(b.month)).pop()
+        return { year: Number(yr), gwp: toNumber(last?.medofis?.gwp) }
       })
       .sort((a, b) => a.year - b.year)
   }, [metrics])
 
-  const productionGroups = useMemo(() => {
-    if (!data) {
-      return {
-        particulares: [],
-        empresa: [],
-        vidaAhorro: [],
-        psc: [],
-      }
-    }
+  const monthlyGwpData = useMemo(() =>
+    globalYear.map(m => ({ mes: MONTHS[Number(m.month) - 1], gwp: toNumber(m.medofis?.gwp) })),
+    [globalYear]
+  )
 
-    const currentMonth = Number(data.month)
+  // ── Cartera pie data (GWP por LOB desde produccion) ──
+  const carteraData = useMemo(() => {
+    if (!data) return []
+    return [
+      { name: "Particulares", value: toNumber(data?.produccion?.particulares) },
+      { name: "Empresa",      value: toNumber(data?.produccion?.empresas) },
+      { name: "Salud",        value: toNumber(data?.produccion?.salud) },
+      { name: "Vida",         value: toNumber(data?.produccion?.vida?.individual) },
+      { name: "Ahorro",       value: toNumber(data?.produccion?.vida?.ahorro) },
+    ].filter(d => d.value > 0)
+  }, [data])
 
-    const previousYearMetrics = metrics
-      .filter(
-        (m: any) =>
-          Number(m.year) === year - 1 &&
-          getMediatorCode(m) === "GLOBAL" &&
-          Number(m.month) <= currentMonth
+  const medofisCarteraData = useMemo(() => {
+    if (!metrics.length || !effectiveMonth) return []
+    return metrics
+      .filter(m =>
+        Number(m.year) === year &&
+        Number(m.month) === effectiveMonth &&
+        getMediatorCode(m) !== "GLOBAL" &&
+        toNumber(m.medofis?.gwp) > 0
       )
-      .sort((a: any, b: any) => Number(a.month) - Number(b.month))
+      .map(m => ({ name: getMediatorCode(m), value: toNumber(m.medofis?.gwp) }))
+      .sort((a, b) => b.value - a.value)
+  }, [metrics, year, effectiveMonth])
 
-    const previousYearSnapshot =
-      previousYearMetrics.length > 0
-        ? previousYearMetrics[previousYearMetrics.length - 1]
-        : null
+  const titleDate = useMemo(() =>
+    effectiveMonth ? `${MONTHS_FULL[effectiveMonth - 1]} ${year}` : "",
+    [effectiveMonth, year]
+  )
 
-    return {
-      particulares: [
-        {
-          name: "Auto",
-          actual: getValueByPath(data, "produccion.particulares.auto"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.auto"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Hogar",
-          actual: getValueByPath(data, "produccion.particulares.hogar"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.hogar"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Comunidades",
-          actual: getValueByPath(data, "produccion.particulares.comunidades"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.comunidades"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Decesos",
-          actual: getValueByPath(data, "produccion.particulares.decesos"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.decesos"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "RC particulares",
-          actual: getValueByPath(data, "produccion.particulares.rc"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.rc"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Salud",
-          actual: getValueByPath(data, "produccion.particulares.salud"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.salud"),
-          color: COLORS[0],
-          isHighlighted: false,
-        },
-        {
-          name: "Total particulares",
-          actual: getValueByPath(data, "produccion.particulares.total"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.particulares.total"),
-          color: COLORS[0],
-          isHighlighted: true,
-        },
-      ],
-      empresa: [
-        {
-          name: "RC empresa",
-          actual: getValueByPath(data, "produccion.empresa.rc"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.rc"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Flotas",
-          actual: getValueByPath(data, "produccion.empresa.flotas"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.flotas"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Comercio",
-          actual: getValueByPath(data, "produccion.empresa.comercio"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.comercio"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Oficina",
-          actual: getValueByPath(data, "produccion.empresa.oficina"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.oficina"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Industria",
-          actual: getValueByPath(data, "produccion.empresa.industria"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.industria"),
-          color: COLORS[1],
-          isHighlighted: false,
-        },
-        {
-          name: "Total empresa",
-          actual: getValueByPath(data, "produccion.empresa.total"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.empresa.total"),
-          color: COLORS[1],
-          isHighlighted: true,
-        },
-      ],
-      vidaAhorro: [
-        {
-          name: "Vida",
-          actual: getValueByPath(data, "produccion.vida.individual"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.vida.individual"),
-          color: COLORS[2],
-          isHighlighted: true,
-        },
-        {
-          name: "Ahorro",
-          actual: getValueByPath(data, "produccion.vida.ahorro"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.vida.ahorro"),
-          color: COLORS[3],
-          isHighlighted: true,
-        },
-      ],
-      psc: [
-        {
-          name: "PSC",
-          actual: getValueByPath(data, "produccion.psc.total"),
-          anterior: getValueByPath(previousYearSnapshot, "produccion.psc.total"),
-          color: COLORS[4],
-          isHighlighted: true,
-        },
-      ],
-    }
-  }, [data, metrics, year])
+  const objRapel = useMemo(
+    () => objetivos?.[year]?.rapelAnual ?? { crecimientoMin: 0, devolucionesMax: 2, saludMin: 8000, vidaMin: 8000 },
+    [objetivos, year]
+  )
 
   if (!data) {
     return (
       <div className="space-y-8">
-        <div className="panel flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Home</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Panel principal de la agencia · {titleDate}
-            </p>
-          </div>
-
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="panel text-center text-slate-400">
-          No hay datos de GLOBAL para este año.
-        </div>
+        <Header title="Panel principal" subtitle="Cargando…" year={year} years={years}
+          onYearChange={y => { setYear(y); setSelectedMonth(0) }}
+          selectedMonth={selectedMonth} availableMonths={[]} onMonthChange={setSelectedMonth} />
+        <div className="panel text-center text-slate-400 py-12">No hay datos para este año.</div>
       </div>
     )
   }
 
-  const gwp = toNumber(data?.medofis?.gwp)
-  const renovacion = toNumber(data?.medofis?.renovacionPct)
-  const tasaNP = toNumber(data?.medofis?.tasaNpPct)
-  const crecimiento = toNumber(data?.medofis?.crecimientoPct)
-  const cor = toNumber(data?.medofis?.cor)
+  const gwp          = toNumber(data?.medofis?.gwp)
+  const renovacion   = toNumber(data?.medofis?.renovacionPct)
+  const tasaNP       = toNumber(data?.medofis?.tasaNpPct)
+  const crecimiento  = toNumber(data?.medofis?.crecimientoPct)
+  const cor          = toNumber(data?.medofis?.cor)
   const devoluciones = toNumber(data?.medofis?.devolucionesPct)
+  const siniestralidad = toNumber(data?.medofis?.siniestralidadSinIbnrPct)
 
-  const prevGwp = previousData ? toNumber(previousData?.medofis?.gwp) : null
-  const prevRenovacion = previousData
-    ? toNumber(previousData?.medofis?.renovacionPct)
-    : null
-  const prevTasaNP = previousData
-    ? toNumber(previousData?.medofis?.tasaNpPct)
-    : null
-  const prevCrecimiento = previousData
-    ? toNumber(previousData?.medofis?.crecimientoPct)
-    : null
-  const prevCor = previousData ? toNumber(previousData?.medofis?.cor) : null
+  const prevGwp          = previousData ? toNumber(previousData?.medofis?.gwp) : null
+  const prevRenovacion   = previousData ? toNumber(previousData?.medofis?.renovacionPct) : null
+  const prevTasaNP       = previousData ? toNumber(previousData?.medofis?.tasaNpPct) : null
+  const prevCrecimiento  = previousData ? toNumber(previousData?.medofis?.crecimientoPct) : null
+  const prevCor          = previousData ? toNumber(previousData?.medofis?.cor) : null
 
-  const prodSalud = toNumber(data?.produccion?.particulares?.salud)
-  const prodVida = toNumber(data?.produccion?.vida?.individual)
-
-  const carteraData = [
-    {
-      name: "Particulares",
-      value: toNumber(data?.cartera?.particulares?.total),
-    },
-    {
-      name: "Empresa",
-      value: toNumber(data?.cartera?.empresa?.total),
-    },
-    {
-      name: "Vida",
-      value: toNumber(data?.cartera?.vida?.individual),
-    },
-    {
-      name: "Ahorro",
-      value: toNumber(data?.cartera?.vida?.ahorro),
-    },
-    {
-      name: "PSC",
-      value: toNumber(data?.cartera?.psc?.total),
-    },
-  ].filter((item) => item.value > 0)
-
-  const objRapel = objetivos?.rapelAnual || {
-    crecimientoMin: 0,
-    devolucionesMax: 2,
-    saludMin: 8000,
-    vidaMin: 8000,
-  }
+  // Rapel usa GWPNP de Salud Individual y Vida Riesgo Individual
+  const prodSalud = toNumber(data?.produccion?.gwpnp?.salud ?? data?.produccion?.salud)
+  const prodVida  = toNumber(data?.produccion?.gwpnp?.vidaInd ?? data?.produccion?.vida?.individual ?? data?.produccion?.vida)
 
   return (
-    <div className="space-y-10">
-      <div className="panel flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Home</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Panel principal de la agencia · {titleDate}
-          </p>
-        </div>
+    <div className="space-y-8">
+      <Header
+        title="Panel principal"
+        subtitle={`Agencia 742776 · ${titleDate}`}
+        year={year} years={years}
+        onYearChange={y => { setYear(y); setSelectedMonth(0) }}
+        selectedMonth={selectedMonth} availableMonths={availableMonths} onMonthChange={setSelectedMonth}
+      />
 
-        <select
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none"
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-        <Kpi
-          title="GWP"
-          value={formatEuros(gwp)}
-          raw={gwp}
-          previousRaw={prevGwp}
-          subvalue={prevGwp !== null ? `Anterior: ${formatEuros(prevGwp)}` : "Anterior: -"}
-          icon={BadgeEuro}
-          type="money"
-        />
-
-        <Kpi
-          title="Renovación"
-          value={formatPercent(renovacion)}
-          raw={renovacion}
-          previousRaw={prevRenovacion}
-          subvalue={
-            prevRenovacion !== null
-              ? `Anterior: ${formatPercent(prevRenovacion)}`
-              : "Anterior: -"
-          }
-          icon={ShieldCheck}
-          type="renovacion"
-        />
-
-        <Kpi
-          title="Tasa NP"
-          value={formatPercent(tasaNP)}
-          raw={tasaNP}
-          previousRaw={prevTasaNP}
-          subvalue={
-            prevTasaNP !== null
-              ? `Anterior: ${formatPercent(prevTasaNP)}`
-              : "Anterior: -"
-          }
-          icon={TrendingUp}
-          type="tnp"
-        />
-
-        <Kpi
-          title="Crecimiento"
-          value={formatPercent(crecimiento)}
-          raw={crecimiento}
-          previousRaw={prevCrecimiento}
-          subvalue={
-            prevCrecimiento !== null
-              ? `Anterior: ${formatPercent(prevCrecimiento)}`
-              : "Anterior: -"
-          }
-          icon={Percent}
-          type="crecimiento"
-        />
-
-        <Kpi
-          title="COR"
-          value={formatPercent(cor)}
-          raw={cor}
-          previousRaw={prevCor}
-          subvalue={prevCor !== null ? `Anterior: ${formatPercent(prevCor)}` : "Anterior: -"}
-          icon={ArrowUpRight}
-          type="cor"
-        />
+      {/* KPIs */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <Kpi title="GWP"              value={fmtEuros(gwp)}           raw={gwp}          prevRaw={prevGwp}         subvalue={prevGwp != null ? `Ant: ${fmtEuros(prevGwp)}` : undefined}           icon={BadgeEuro}    type="money" />
+        <Kpi title="Renovación"       value={fmtPct(renovacion)}      raw={renovacion}   prevRaw={prevRenovacion}  subvalue={prevRenovacion != null ? `Ant: ${fmtPct(prevRenovacion)}` : undefined}  icon={ShieldCheck}  type="renovacion" />
+        <Kpi title="Tasa NP"          value={fmtPct(tasaNP)}          raw={tasaNP}       prevRaw={prevTasaNP}      subvalue={prevTasaNP != null ? `Ant: ${fmtPct(prevTasaNP)}` : undefined}         icon={TrendingUp}   type="tnp" />
+        <Kpi title="Crecimiento"      value={fmtPct(crecimiento)}     raw={crecimiento}  prevRaw={prevCrecimiento} subvalue={prevCrecimiento != null ? `Ant: ${fmtPct(prevCrecimiento)}` : undefined} icon={Percent}      type="crecimiento" />
+        <Kpi title="COR"              value={fmtPct(cor)}             raw={cor}          prevRaw={prevCor}         subvalue={prevCor != null ? `Ant: ${fmtPct(prevCor)}` : undefined}               icon={ArrowUpRight} type="cor" />
+        <Kpi title="Siniest. IBNR"    value={fmtPct(siniestralidad)}  raw={siniestralidad} prevRaw={null}         subvalue="Total IARD"                                                             icon={AlertTriangle} type="siniestralidad" />
       </section>
 
-      <details
-        open
-        className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel"
-      >
+      {/* Rapel */}
+      <details open className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-panel">
         <summary className="cursor-pointer list-none px-6 py-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Target size={18} className="text-[#003A8F]" />
-              <h3 className="text-lg font-semibold text-slate-900">
-                Seguimiento del rapel anual
-              </h3>
+              <h3 className="text-lg font-semibold text-slate-900">Seguimiento del rapel anual</h3>
             </div>
             <span className="text-sm text-slate-400">Abrir / cerrar</span>
           </div>
         </summary>
-
         <div className="border-t border-slate-100 px-6 py-6">
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <ProgressCard
-              title="Crecimiento mínimo"
-              actual={crecimiento}
-              objetivo={toNumber(objRapel.crecimientoMin)}
-              mode="min"
-              suffix="%"
-            />
-
-            <ProgressCard
-              title="% devueltos máximo"
-              actual={devoluciones}
-              objetivo={toNumber(objRapel.devolucionesMax)}
-              mode="max"
-              suffix="%"
-            />
-
-            <ProgressCard
-              title="Producción Salud"
-              actual={prodSalud}
-              objetivo={toNumber(objRapel.saludMin)}
-              suffix="€"
-            />
-
-            <ProgressCard
-              title="Producción Vida"
-              actual={prodVida}
-              objetivo={toNumber(objRapel.vidaMin)}
-              suffix="€"
-            />
+            <ProgressCard title="Crecimiento mínimo"  actual={crecimiento} objetivo={toNumber(objRapel.crecimientoMin)} mode="min" suffix="%" />
+            <ProgressCard title="% PTE P.Adq máximo" actual={devoluciones} objetivo={toNumber(objRapel.devolucionesMax)} mode="max" suffix="%" />
+            <ProgressCard title="Producción Salud"    actual={prodSalud}   objetivo={toNumber(objRapel.saludMin)} suffix="€" />
+            <ProgressCard title="Producción Vida"     actual={prodVida}    objetivo={toNumber(objRapel.vidaMin)}  suffix="€" />
           </div>
         </div>
       </details>
 
+      {/* Charts + Producción */}
       <section className="grid gap-8 xl:grid-cols-3">
         <div className="space-y-8 xl:col-span-1">
-          <div className="panel">
-            <div>
-              <h3 className="font-semibold text-slate-900">
-                Composición de cartera <span className="text-slate-400">(GWP)</span>
-              </h3>
-            </div>
 
+          {/* Composición cartera */}
+          <div className="panel">
+            <h3 className="font-semibold text-slate-900">
+              Composición de cartera <span className="text-slate-400 font-normal text-sm">(GWP)</span>
+            </h3>
             <div className="mt-4 h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={carteraData}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={108}
-                    innerRadius={52}
-                    minAngle={2}
-                    label={percentLabel}
-                    labelLine={false}
+                  <Pie data={carteraData} dataKey="value" nameKey="name"
+                    outerRadius={100} innerRadius={50} minAngle={2}
+                    label={PieLabel} labelLine={{ stroke: "#94a3b8", strokeWidth: 1 }}
                   >
-                    {carteraData.map((entry, index) => (
-                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                    {carteraData.map((e, i) => <Cell key={e.name} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-
-                  <Tooltip formatter={(v: number) => formatEuros(v)} />
-                  <Legend />
+                  <Tooltip formatter={(v: number) => fmtEuros(v)} />
+                  <Legend iconType="circle" iconSize={8}
+                    formatter={v => <span className="text-xs text-slate-600">{v}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="panel">
-            <div>
+          {/* Cartera por MEDOFIS */}
+          {medofisCarteraData.length > 0 && (
+            <div className="panel">
               <h3 className="font-semibold text-slate-900">
-                Comparativa anual
+                Cartera por MEDOFIS <span className="text-slate-400 font-normal text-sm">(GWP)</span>
               </h3>
-              <p className="mt-1 text-sm text-slate-400">
-                GWP a cierre de diciembre
-              </p>
+              <div className="mt-4 h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={medofisCarteraData} dataKey="value" nameKey="name"
+                      outerRadius={88} innerRadius={44} minAngle={2}
+                      label={PieLabel} labelLine={{ stroke: "#94a3b8", strokeWidth: 1 }}
+                    >
+                      {medofisCarteraData.map((_: any, i: number) => (
+                        <Cell key={i} fill={MEDOFIS_COLORS[i % MEDOFIS_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => fmtEuros(v)} />
+                    <Legend iconType="circle" iconSize={8}
+                      formatter={v => <span className="text-xs text-slate-600">{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+          )}
 
-            <div className="mt-6 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={yearlyData}
-                  margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="2 4" vertical={false} />
-                  <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => {
-                      if (value >= 1000000) {
-                        return `${(value / 1000000).toFixed(1)}M`
-                      }
-                      if (value >= 1000) {
-                        return `${Math.round(value / 1000)}k`
-                      }
-                      return `${value}`
-                    }}
-                  />
-                  <Tooltip formatter={(v: number) => formatEuros(v)} />
-                  <Line
-                    type="monotone"
-                    dataKey="gwp"
-                    stroke="#003A8F"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: "#003A8F", strokeWidth: 0 }}
-                    activeDot={{ r: 6, fill: "#003A8F" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+          {/* Evolución + comparativa */}
+          <div className="panel space-y-6">
+            {monthlyGwpData.length > 0 && (
+              <div>
+                <h3 className="font-semibold text-slate-900">Evolución mensual GWP</h3>
+                <p className="mt-1 text-xs text-slate-400">Acumulado YTD por mes · {year}</p>
+                <div className="mt-3 h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyGwpData} margin={{ top:4, right:12, left:0, bottom:0 }}>
+                      <CartesianGrid strokeDasharray="2 4" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} width={42}
+                        tickFormatter={v => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1000 ? `${Math.round(v/1000)}k` : `${v}`} />
+                      <Tooltip formatter={(v: number) => fmtEuros(v)} />
+                      <Line type="monotone" dataKey="gwp" stroke="#003A8F" strokeWidth={2.5}
+                        dot={{ r: 4, fill: "#003A8F", strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      {effectiveMonth > 0 && (
+                        <ReferenceLine x={MONTHS[effectiveMonth - 1]} stroke="#F6D88A" strokeWidth={2}
+                          strokeDasharray="4 2"
+                          label={{ value: "actual", position: "top", fontSize: 10, fill: "#92400e" }} />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="font-semibold text-slate-900">Comparativa anual</h3>
+              <p className="mt-1 text-xs text-slate-400">GWP acumulado último dato por año</p>
+              <div className="mt-3 h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={yearlyData} margin={{ top:4, right:12, left:0, bottom:0 }}>
+                    <CartesianGrid strokeDasharray="2 4" vertical={false} />
+                    <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} width={42}
+                      tickFormatter={v => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1000 ? `${Math.round(v/1000)}k` : `${v}`} />
+                    <Tooltip formatter={(v: number) => fmtEuros(v)} />
+                    <Line type="monotone" dataKey="gwp" stroke="#003A8F" strokeWidth={2.5}
+                      dot={{ r: 4, fill: "#003A8F", strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Análisis de producción */}
         <div className="panel xl:col-span-2">
-          <div>
-            <h3 className="font-semibold text-slate-900">
-              Análisis de producción <span className="text-slate-400">(GWPNP)</span>
-            </h3>
-          </div>
-
+          <h3 className="font-semibold text-slate-900">
+            Análisis de producción <span className="text-slate-400 font-normal text-sm">(GWPNP)</span>
+          </h3>
           <div className="mt-4 space-y-3">
-            <ProductionTable title="Particulares" data={productionGroups.particulares} />
-            <ProductionTable title="Empresa" data={productionGroups.empresa} />
-            <ProductionTable title="Vida y Ahorro" data={productionGroups.vidaAhorro} />
-            <ProductionTable title="PSC" data={productionGroups.psc} />
+            <ProductionTable title="Particulares"  data={productionGroups.particulares} />
+            <ProductionTable title="Empresa"       data={productionGroups.empresa} />
+            <ProductionTable title="Salud"         data={productionGroups.salud} />
+            <ProductionTable title="Vida" data={productionGroups.vida} />
+            <ProductionTable title="Ahorro"        data={productionGroups.ahorro} />
           </div>
         </div>
       </section>
@@ -699,157 +555,162 @@ export default function HomePage() {
   )
 }
 
-function Kpi({
-  title,
-  value,
-  subvalue,
-  raw,
-  previousRaw,
-  icon: Icon,
-  type,
+// ─── Header ───────────────────────────────────────────────────────────────────
+
+function Header({
+  title, subtitle, year, years, onYearChange, selectedMonth, availableMonths, onMonthChange,
 }: {
-  title: string
-  value: string
-  subvalue?: string
-  raw: number
-  previousRaw?: number | null
-  icon: any
-  type: "money" | "renovacion" | "tnp" | "crecimiento" | "cor"
+  title: string; subtitle: string
+  year: number; years: number[]; onYearChange: (y: number) => void
+  selectedMonth: number; availableMonths: number[]; onMonthChange: (m: number) => void
 }) {
-  function getColor() {
-    if (type === "renovacion") {
-      if (raw < 70) return "text-red-600"
-      if (raw <= 90) return "text-orange-500"
-      return "text-green-600"
-    }
-
-    if (type === "tnp") {
-      if (raw < 10) return "text-red-600"
-      if (raw < 15) return "text-orange-500"
-      return "text-green-600"
-    }
-
-    if (type === "crecimiento") {
-      if (raw < 0) return "text-red-600"
-      if (raw <= 5) return "text-orange-500"
-      return "text-green-600"
-    }
-
-    if (type === "cor") {
-      if (raw > 100) return "text-red-600"
-      return "text-green-600"
-    }
-
-    return "text-[#003A8F]"
-  }
-
-  function renderArrow() {
-    if (previousRaw === undefined || previousRaw === null) return null
-    if (raw > previousRaw) return <span className="text-green-600">▲</span>
-    if (raw < previousRaw) return <span className="text-red-600">▼</span>
-    return <span className="text-slate-300">•</span>
-  }
-
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-panel">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-slate-500">{title}</p>
-        <Icon size={20} className="text-[#003A8F]" />
+    <div className="panel flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
       </div>
-
-      <p className={`mt-3 text-3xl font-bold ${getColor()}`}>{value}</p>
-
-      {subvalue ? (
-        <p className="mt-3 flex items-center gap-1 text-xs text-slate-500">
-          {renderArrow()}
-          <span>{subvalue}</span>
-        </p>
-      ) : null}
+      <div className="flex items-center gap-3">
+        {availableMonths.length > 0 && (
+          <select value={selectedMonth} onChange={e => onMonthChange(Number(e.target.value))}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none">
+            <option value={0}>Último disponible</option>
+            {availableMonths.map(m => <option key={m} value={m}>{MONTHS_FULL[m - 1]}</option>)}
+          </select>
+        )}
+        <select value={year} onChange={e => onYearChange(Number(e.target.value))}
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none">
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
     </div>
   )
 }
 
-function ProductionTable({
-  title,
-  data,
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+
+function Kpi({
+  title, value, subvalue, raw, prevRaw, icon: Icon, type,
 }: {
-  title: string
-  data: Array<{
-    name: string
-    actual: number
-    anterior: number
-    color: string
-    isHighlighted?: boolean
-  }>
+  title: string; value: string; subvalue?: string
+  raw: number; prevRaw?: number | null; icon: any
+  type: "money"|"renovacion"|"tnp"|"crecimiento"|"cor"|"siniestralidad"
 }) {
-  function getVariation(actual: number, anterior: number) {
-    return actual - anterior
+  function color() {
+    if (type === "renovacion")    return raw < 70   ? "text-red-600" : raw <= 90  ? "text-orange-500" : "text-green-600"
+    if (type === "tnp")           return raw < 12.5 ? "text-red-600" : raw < 15   ? "text-orange-500" : "text-green-600"  // contrato: <12.5=0%, 12.5-15=70%, ≥15=100%
+    if (type === "crecimiento")   return raw <= 0   ? "text-red-600" : "text-green-600"  // contrato: debe ser >0
+    if (type === "cor")           return raw >= 100 ? "text-red-600" : "text-green-600"  // contrato: <100%
+    if (type === "siniestralidad") return raw > 80  ? "text-red-600" : raw > 60  ? "text-orange-500" : "text-green-600"
+    return "text-[#003A8F]"
   }
 
-  function getVariationColor(value: number) {
-    if (value > 0) return "text-green-600"
-    if (value < 0) return "text-red-600"
-    return "text-slate-400"
-  }
-
-  function renderVariation(value: number) {
-    const sign = value > 0 ? "+" : value < 0 ? "-" : ""
-    return `${sign}${formatEuros(Math.abs(value))}`
+  function trend() {
+    if (prevRaw == null) return null
+    const up = type === "cor" || type === "siniestralidad" ? raw < prevRaw : raw > prevRaw
+    if (raw === prevRaw) return <span className="text-slate-300 text-xs">–</span>
+    return up
+      ? <span className="text-green-600 text-xs">▲</span>
+      : <span className="text-red-600 text-xs">▼</span>
   }
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3">
-      <h4 className="font-semibold text-slate-800 mb-2">{title}</h4>
-
-      <div className="grid grid-cols-4 text-[11px] font-medium text-slate-400 mb-1 px-2">
-        <span>Ramo</span>
-        <span className="text-right">2025</span>
-        <span className="text-right">2026</span>
-        <span className="text-right">Var.</span>
+    <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-panel flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{title}</p>
+        <Icon size={16} className="text-slate-400 shrink-0" />
       </div>
+      <p className={`text-2xl font-bold leading-none ${color()}`}>{value}</p>
+      {subvalue && (
+        <p className="flex items-center gap-1 text-xs text-slate-400">
+          {trend()} <span>{subvalue}</span>
+        </p>
+      )}
+    </div>
+  )
+}
 
-      <div className="space-y-0.5">
-        {data.map((item, i) => {
-          const variation = getVariation(item.actual, item.anterior)
+// ─── Production Table ─────────────────────────────────────────────────────────
 
-          return (
-            <div
-              key={i}
-              className={`grid grid-cols-4 items-center px-2 py-1.5 rounded-lg border ${
-                item.isHighlighted
-                  ? "bg-white border-slate-200"
-                  : "border-transparent hover:bg-white/70"
-              }`}
-            >
+function VarBadge({ actual, anterior }: { actual: number; anterior: number }) {
+  if (anterior === 0 && actual === 0) return <span className="text-slate-300 text-xs text-right block">—</span>
+  if (anterior === 0) return (
+    <span className="inline-flex justify-end">
+      <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 rounded-full px-2 py-0.5">NUEVO</span>
+    </span>
+  )
+  const pct = ((actual - anterior) / Math.abs(anterior)) * 100
+  const up  = pct >= 0
+  const color = up ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"
+  const arrow = up ? "▲" : "▼"
+  return (
+    <span className="inline-flex justify-end">
+      <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${color}`}>
+        {arrow} {Math.abs(pct).toFixed(1)}%
+      </span>
+    </span>
+  )
+}
+
+function ProductionTable({ title, data }: {
+  title: string
+  data: ProdRow[]
+}) {
+  const accentColor = data[0]?.color ?? "#003A8F"
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
+      <div className="p-3">
+        <h4 className="font-semibold text-sm text-slate-800 mb-2 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
+          {title}
+        </h4>
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr_1fr] text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 px-2">
+          <span>Ramo</span>
+          <span className="text-right">Año ant.</span>
+          <span className="text-right">Actual</span>
+          <span className="text-right">Var.</span>
+          <span className="text-right">TNP%</span>
+          <span className="text-right">Pólizas</span>
+        </div>
+        <div className="space-y-0.5">
+          {data.map((item, i) => (
+            <div key={i} className={`grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr_1fr] items-center px-2 py-1.5 rounded-lg border transition-colors ${
+              item.isHighlighted ? "bg-slate-50 border-slate-200" : "border-transparent hover:bg-slate-50"
+            }`}>
               <span
-                className={`text-sm ${
-                  item.isHighlighted
-                    ? "font-semibold"
-                    : "font-medium"
-                }`}
-                style={{
-                  color: item.isHighlighted ? item.color : "#334155",
-                }}
+                className={`text-sm truncate ${item.isHighlighted ? "font-bold" : "font-medium text-slate-700"}`}
+                style={{ color: item.isHighlighted ? item.color : undefined }}
               >
                 {item.name}
               </span>
-
-              <span className="text-right text-sm text-slate-900">
-                {formatEuros(item.anterior)}
+              <span className="text-right text-xs text-slate-400">{fmtEuros(item.anterior)}</span>
+              <span className={`text-right text-xs font-semibold ${item.isHighlighted ? "text-slate-900" : "text-slate-800"}`}>
+                {fmtEuros(item.actual)}
               </span>
-
-              <span className="text-right text-sm text-slate-900">
-                {formatEuros(item.actual)}
-              </span>
-
-              <span
-                className={`text-right text-sm font-semibold ${getVariationColor(variation)}`}
-              >
-                {renderVariation(variation)}
-              </span>
+              <VarBadge actual={item.actual} anterior={item.anterior} />
+              {item.tasaNp > 0 ? (
+                <span className={`text-right text-xs font-semibold ${
+                  item.tasaNp < 12.5 ? "text-red-500" : item.tasaNp < 15 ? "text-orange-500" : "text-emerald-600"
+                }`}>{item.tasaNp.toFixed(1)}%</span>
+              ) : (
+                <span className="text-right text-xs text-slate-300">—</span>
+              )}
+              {item.np > 0 ? (
+                <span className="text-right text-xs text-slate-600">
+                  <span className="font-semibold">{Math.round(item.np)}</span>
+                  {item.np_ant > 0 && (
+                    <span className={`ml-1 text-[10px] ${item.np >= item.np_ant ? "text-emerald-500" : "text-red-400"}`}>
+                      {item.np >= item.np_ant ? "▲" : "▼"}{Math.abs(item.np - item.np_ant).toFixed(0)}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-right text-xs text-slate-300">—</span>
+              )}
             </div>
-          )
-        })}
+          ))}
+        </div>
       </div>
     </div>
   )

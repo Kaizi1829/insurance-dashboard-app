@@ -110,7 +110,7 @@ function getQuarterLabel(month: number) {
 }
 
 export default function SeguimientoObjetivosPage() {
-  const [year, setYear] = useState(2026)
+  const [year, setYear] = useState(0)
   const [metrics, setMetrics] = useState<any[]>([])
   const [objetivos, setObjetivos] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -120,9 +120,18 @@ export default function SeguimientoObjetivosPage() {
       try {
         setLoading(true)
 
+        // Auto-detectar el último año con datos si aún no hay año seleccionado
+        let activeYear = year
+        if (!activeYear) {
+          const periodsRes = await fetch("/api/available-periods")
+          const periodsJson = await periodsRes.json()
+          activeYear = periodsJson?.metrics?.latest?.year ?? 2026
+          setYear(activeYear)
+        }
+
         const [metricsRes, objetivosRes] = await Promise.all([
           fetch("/api/metrics"),
-          fetch(`/api/objetivos?year=${year}`),
+          fetch(`/api/objetivos?year=${activeYear}`),
         ])
 
         const metricsJson = await metricsRes.json()
@@ -177,7 +186,7 @@ export default function SeguimientoObjetivosPage() {
 
     const crecimientoReal = toNumber(lastMetric?.medofis?.crecimientoPct)
     const devolucionesReal = toNumber(lastMetric?.medofis?.devolucionesPct)
-    const saludReal = toNumber(lastMetric?.produccion?.particulares?.salud)
+    const saludReal = toNumber(lastMetric?.produccion?.salud?.total)
     const vidaReal = toNumber(lastMetric?.produccion?.vida?.individual)
 
     return [
@@ -191,7 +200,7 @@ export default function SeguimientoObjetivosPage() {
         isPercent: true,
       },
       {
-        label: "% devueltos máximo",
+        label: "% PTE P.Adq máximo",
         meta: devolucionesMeta,
         real: devolucionesReal,
         cumplimiento: getCumplimiento(devolucionesReal, devolucionesMeta, true),
@@ -228,7 +237,7 @@ export default function SeguimientoObjetivosPage() {
     const vidaMeta = toNumber(objetivos?.grados?.vida)
     const pscMeta = toNumber(objetivos?.grados?.psc)
 
-    const saludReal = toNumber(lastMetric?.produccion?.particulares?.salud)
+    const saludReal = toNumber(lastMetric?.produccion?.salud?.total)
     const empresaReal = toNumber(lastMetric?.produccion?.empresa?.total)
     const vidaReal = toNumber(lastMetric?.produccion?.vida?.individual)
     const pscReal = toNumber(lastMetric?.produccion?.psc?.total)
@@ -339,17 +348,17 @@ export default function SeguimientoObjetivosPage() {
       {
         label: "Salud",
         meta: toNumber(quarterGoals?.salud),
-        real: toNumber(lastMetric?.produccion?.particulares?.salud),
+        real: toNumber(lastMetric?.produccion?.salud?.total),
         cumplimiento: getCumplimiento(
-          toNumber(lastMetric?.produccion?.particulares?.salud),
+          toNumber(lastMetric?.produccion?.salud?.total),
           toNumber(quarterGoals?.salud)
         ),
         falta: getFalta(
-          toNumber(lastMetric?.produccion?.particulares?.salud),
+          toNumber(lastMetric?.produccion?.salud?.total),
           toNumber(quarterGoals?.salud)
         ),
         estado: getEstado(
-          toNumber(lastMetric?.produccion?.particulares?.salud),
+          toNumber(lastMetric?.produccion?.salud?.total),
           toNumber(quarterGoals?.salud),
           { devengaLabel: true }
         ),

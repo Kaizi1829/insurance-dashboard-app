@@ -7,12 +7,7 @@ const months = [
   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
 ]
 
-const mediators = [
-  "GLOBAL",
-  "742776",
-  "755224",
-  "742826"
-]
+// Los mediadores se cargan dinámicamente desde la BD
 
 /* ---------- COLORES ---------- */
 
@@ -86,31 +81,43 @@ function toNumber(value:any){
 
 export default function Medofis(){
 
-  const [year,setYear] = useState(2026)
+  const [year,setYear] = useState(0)
   const [mediator,setMediator] = useState("GLOBAL")
   const [metrics,setMetrics] = useState<any[]>([])
   const [years,setYears] = useState<number[]>([])
+  const [mediators,setMediators] = useState<string[]>(["GLOBAL"])
 
   useEffect(()=>{
 
     async function load(){
 
-      const res = await fetch("/api/metrics")
-      const data = await res.json()
+      const [metricsRes, periodsRes] = await Promise.all([
+        fetch("/api/metrics"),
+        fetch("/api/available-periods"),
+      ])
+
+      const data = await metricsRes.json()
+      const periodsJson = await periodsRes.json()
 
       if(!Array.isArray(data)) return
 
       setMetrics(data)
 
+      // Años disponibles
       const availableYears = [
-        ...new Set(
-          data
-            .map((m:any)=>Number(m.year))
-            .filter((y:number)=>!Number.isNaN(y))
-        )
+        ...new Set(data.map((m:any)=>Number(m.year)).filter((y:number)=>!Number.isNaN(y)))
       ].sort((a,b)=>b-a)
-
       setYears(availableYears)
+
+      // Auto-seleccionar el último año con datos
+      const latestYear = periodsJson?.metrics?.latest?.year
+      if(latestYear && year === 0) setYear(latestYear)
+
+      // Mediadores disponibles — dinámico desde la BD
+      const allMediators = [
+        ...new Set(data.map((m:any) => m.mediator_code ?? m.mediatorCode).filter(Boolean))
+      ].sort((a:string,b:string) => a === 'GLOBAL' ? -1 : b === 'GLOBAL' ? 1 : a.localeCompare(b))
+      setMediators(allMediators as string[])
 
     }
 
