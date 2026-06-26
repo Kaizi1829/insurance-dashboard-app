@@ -393,10 +393,9 @@ export default function HomePage() {
   const prevCrecimiento  = previousData ? toNumber(previousData?.medofis?.crecimientoPct) : null
   const prevCor          = previousData ? toNumber(previousData?.medofis?.cor) : null
 
-  // produccion.salud y produccion.vida son números directos (GWP total del LOB)
-  // produccion.vida.individual viene de argos_vida (Pure Protection Individual)
-  const prodSalud = toNumber(data?.produccion?.salud)
-  const prodVida  = toNumber(data?.produccion?.vida?.individual ?? data?.produccion?.vida)
+  // Rapel usa GWPNP de Salud Individual y Vida Riesgo Individual
+  const prodSalud = toNumber(data?.produccion?.gwpnp?.salud ?? data?.produccion?.salud)
+  const prodVida  = toNumber(data?.produccion?.gwpnp?.vidaInd ?? data?.produccion?.vida?.individual ?? data?.produccion?.vida)
 
   return (
     <div className="space-y-8">
