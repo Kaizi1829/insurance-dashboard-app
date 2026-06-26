@@ -8,7 +8,7 @@ import {
   factorTNP,
   type TramoRapel,
 } from "@/lib/objetivos"
-import { CheckCircle2, XCircle, TrendingUp, TrendingDown, Minus, AlertCircle, Award, Trophy } from "lucide-react"
+import { CheckCircle2, XCircle, TrendingUp, TrendingDown, Minus, AlertCircle, Award, Trophy, ChevronDown, ChevronUp } from "lucide-react"
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const toN = (v: any) => (v === null || v === undefined || isNaN(Number(v)) ? 0 : Number(v))
@@ -47,22 +47,32 @@ const pscGwpA   = (nv: any[], vida: any[]) =>
 const crec = (act: number, ant: number) => ant > 0 ? ((act - ant) / ant) * 100 : 0
 
 // ─── Sección wrapper ───────────────────────────────────────────────────────────
-function Section({ number, title, subtitle, children, accent = "#003A8F" }: {
+function Section({ number, title, subtitle, children, accent = "#003A8F", collapsible = false, defaultOpen = true }: {
   number: string; title: string; subtitle?: string; children: React.ReactNode; accent?: string
+  collapsible?: boolean; defaultOpen?: boolean
 }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <section className="rounded-3xl border border-slate-100 bg-white overflow-hidden shadow-sm">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-start gap-4">
+      <div
+        className={`px-6 py-4 border-b border-slate-100 flex items-start gap-4 ${collapsible ? "cursor-pointer select-none" : ""}`}
+        onClick={collapsible ? () => setOpen(o => !o) : undefined}
+      >
         <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold mt-0.5"
           style={{ backgroundColor: accent }}>
           {number}
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
+        {collapsible && (
+          <div className="flex-shrink-0 mt-1 text-slate-400">
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </div>
+        )}
       </div>
-      <div className="p-5">{children}</div>
+      {open && <div className="p-5">{children}</div>}
     </section>
   )
 }
@@ -382,32 +392,33 @@ export default function ObjetivosPage() {
           1 — RAPEL ANUAL
       ══════════════════════════════════════════════ */}
       <Section number="1" title="Rapel Anual"
-        subtitle="Combinación de crecimiento de cartera (70%) + nueva producción (30%) · liquidación al cierre del año">
+        subtitle="Combinación de crecimiento de cartera (70%) + nueva producción (30%) · liquidación al cierre del año"
+        collapsible>
 
         {/* Resumen en grande */}
-        <div className="rounded-2xl overflow-hidden border-2 border-[#003A8F] mb-5">
-          <div className="bg-[#003A8F] px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden mb-5">
+          <div className="px-5 py-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-blue-200 text-xs font-medium uppercase tracking-wide">Rapel estimado · si cerráramos hoy</div>
-              <div className="text-white text-xs opacity-60 mt-0.5">Requiere cumplir las 5 condiciones</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Rapel estimado · si cerráramos hoy</div>
+              <div className="text-xs text-slate-400">Requiere cumplir las 5 condiciones</div>
             </div>
             <div className="text-right">
-              <div className="text-4xl font-bold text-white">{fmtE(devengos.total)}</div>
-              <div className="text-xs text-blue-200 mt-1">
+              <div className="text-4xl font-bold text-slate-900">{fmtE(devengos.total)}</div>
+              <div className="text-xs text-slate-400 mt-1">
                 {devengos.total >= CONDICIONES_2026.devengMax
                   ? "⚠ Tope máximo (125.000€)"
                   : `Faltan ${fmtE(CONDICIONES_2026.devengMax - devengos.total)} para el máximo`}
               </div>
             </div>
           </div>
-          <div className="bg-[#002d70] grid grid-cols-2 divide-x divide-[#003A8F]">
+          <div className="border-t border-slate-200 grid grid-cols-2 divide-x divide-slate-200 bg-white">
             <div className="px-5 py-3 flex items-center justify-between">
-              <span className="text-blue-300 text-xs">Crecimiento GWP (70%)</span>
-              <span className="text-white font-bold">{fmtE(devengos.crecimiento)}</span>
+              <span className="text-slate-500 text-xs">Crecimiento GWP (70%)</span>
+              <span className="font-semibold text-slate-800 text-sm">{fmtE(devengos.crecimiento)}</span>
             </div>
             <div className="px-5 py-3 flex items-center justify-between">
-              <span className="text-blue-300 text-xs">Nueva Producción (30%)</span>
-              <span className="text-white font-bold">{fmtE(devengos.nuevaProd)}</span>
+              <span className="text-slate-500 text-xs">Nueva Producción (30%)</span>
+              <span className="font-semibold text-slate-800 text-sm">{fmtE(devengos.nuevaProd)}</span>
             </div>
           </div>
         </div>
